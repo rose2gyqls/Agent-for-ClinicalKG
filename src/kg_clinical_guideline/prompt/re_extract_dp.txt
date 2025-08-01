@@ -1,0 +1,43 @@
+You are a medical expert tasked with re-extracting diagnostic pairs (DPs) from clinical guideline text.
+
+The following diagnostic pair failed validation and needs to be re-extracted:
+
+**Failed DP:**
+- Condition: {condition}
+- Symptom: {symptom}
+- Relationship: {relationship}
+
+**Validation Issues:**
+{validation_issues}
+
+**Original Text Section:**
+{text_section}
+
+Please carefully re-read the original text and extract a more accurate diagnostic pair. Focus on:
+
+1. **Precision**: Use exact terms as mentioned in the text
+2. **Context**: Consider the full context around the diagnostic information
+3. **Clinical accuracy**: Ensure the relationship is clinically sound and supported by the text
+4. **Specificity**: Be specific in terminology, avoid generalizations
+
+IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
+
+{{
+  "condition": "Specific medical condition as mentioned in text",
+  "symptom": "Specific symptom, sign, or diagnostic criterion",
+  "relationship": "precise relationship (e.g., 'indicates', 'suggests', 'rules out', 'confirms')",
+  "confidence": "high",
+  "text_evidence": "exact quote from the original text that supports this DP"
+}}
+
+If you cannot extract a valid diagnostic pair from this text section, return:
+
+{{
+  "condition": null,
+  "symptom": null,
+  "relationship": null,
+  "confidence": "low",
+  "text_evidence": "No clear diagnostic relationship found in this text section"
+}}
+
+Do not include any other text, explanations, or markdown formatting. Return only the JSON object.

@@ -1,0 +1,87 @@
+[tool.poetry]
+name = "kg-clinical-guideline"
+version = "0.1.0"
+description = "LangGraph를 활용한 의료 지침 가이드라인을 지식 그래프로 변환하는 프로젝트"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "kg_clinical_guideline", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+google-generativeai = "^0.8.5"
+pydantic = "^2.5.2"
+python-dotenv = "^1.0.0"
+typing-extensions = "^4.8.0"
+langgraph = "^0.4.3"
+boto3 = "^1.38.13"
+json-repair = "^0.44.1"
+graphviz = "^0.20.3"
+elasticsearch = "^9.0.1"
+transformers = "^4.36.0"
+torch = "^2.1.0"
+rank-bm25 = "^0.2.2"
+nltk = "^3.8.1"
+protobuf = "^5.0.0"
+streamlit = "^1.46.1"
+pypdf2 = "^3.0.1"
+sentence-transformers = "^2.2.2"
+numpy = "^1.24.0"
+neo4j = "^5.15.0"
+rdflib = "^7.0.0"
+owlready2 = "^0.46"
+spacy = "^3.7.0"
+networkx = "^3.2.1"
+requests = "^2.31.0"
+tqdm = "^4.66.0"
+pandas = "^2.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
+pytest-asyncio = "^1.0.0"
+black = "^23.12.0"
+isort = "^5.13.0"
+flake8 = "^6.1.0"
+mypy = "^1.8.0"
+
+[tool.poetry.scripts]
+kg-clinical = "kg_clinical_guideline.cli:app"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line-length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--cov=src/kg_clinical_guideline --cov-report=html --cov-report=term-missing"

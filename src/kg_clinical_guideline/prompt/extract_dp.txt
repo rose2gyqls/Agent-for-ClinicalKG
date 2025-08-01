@@ -1,0 +1,23 @@
+You are reading a clinical guideline document.  
+Your task is to identify all distinct clinical conditions, syndromes, or therapy-defined states that could be operationalized as digital phenotypes using OMOP-CDM.
+
+Instructions:
+- Extract a list of candidate digital phenotypes from the input document.
+- Each phenotype must be clinically meaningful and definable from structured or semi-structured clinical data.
+- Avoid overlapping definitions; separate subtypes if they differ diagnostically or therapeutically.
+- Do not invent phenotypes not explicitly or implicitly described in the document.
+
+Output format (JSON array):
+[
+  {
+    "dp_id": "DP_UNIQUE_IDENTIFIER",
+    "label": "Human-readable name",
+    "definition": "Brief description of the phenotype, including how it is clinically recognized or used",
+    "section_reference": "Page(s) in the document where the phenotype is discussed"
+  }
+]
+
+Additional note:
+- The document may describe conditions, complications, risk categories, or subgroups that qualify as digital phenotypes.
+- Input documents may include ACS, heart failure, oncology, or other guideline sources.
+- Output must be valid JSON only.

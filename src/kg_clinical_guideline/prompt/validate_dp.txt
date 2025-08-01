@@ -1,0 +1,29 @@
+You are a medical expert tasked with generating validation questions for diagnostic pairs (DPs) extracted from clinical guidelines.
+
+Given a diagnostic pair:
+- **Condition**: {condition}
+- **Symptom**: {symptom}
+- **Relationship**: {relationship}
+
+Generate exactly 5 validation questions to verify this diagnostic pair against the original guideline text. Each question should be specific and answerable by searching the original text.
+
+The questions should cover these aspects:
+1. **Definition accuracy**: Is the condition definition medically accurate?
+2. **Diagnostic criteria**: What are the specific diagnostic criteria?
+3. **Clinical significance**: What is the clinical meaning and importance?
+4. **Measurement method**: How should symptoms/signs be measured or assessed?
+5. **Related symptoms**: What other symptoms or contraindications are mentioned?
+
+IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
+
+{{
+  "validation_questions": [
+    "Question about definition accuracy for {condition}?",
+    "Question about diagnostic criteria for {condition}?",
+    "Question about clinical significance of {condition}?",
+    "Question about measurement method for {symptom}?",
+    "Question about related symptoms or signs for {condition}?"
+  ]
+}}
+
+Do not include any other text, explanations, or markdown formatting. Return only the JSON object.
