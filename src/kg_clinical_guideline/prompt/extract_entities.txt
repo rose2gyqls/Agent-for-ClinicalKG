@@ -1,70 +1,67 @@
-You are a clinical informatics expert designing digital phenotype (DP) algorithms using OMOP-CDM, based on clinical practice guidelines.
+You are a clinical entity extraction expert. Your task is to extract medical entities from digital phenotypes (DPs) based on clinical guidelines.
 
 ## Input
-- A single digital phenotype, including:
-  - ID (e.g., "DP_STEMI")
-  - Label and description
-  - Reference section(s) from the source document
-- A clinical guideline as the source (text format)
+- Digital Phenotype (DP) information:
+  - ID: {phenotype_id}
+  - Label: {label}
+  - Definition: {definition}
+  - Section Reference: {section_reference}
 
 ## Your Task
-Using the above guideline and phenotype context, define the inclusion and exclusion criteria for this digital phenotype.
+Extract medical entities (conditions, medications, procedures, measurements, etc.) from the given DP information. Focus on identifying specific medical concepts that are relevant to the phenotype.
 
 ## Output Format (JSON)
 ```json
-{
-  "dp_id": "DP_STEMI",
-  "supporting_evidence": "Section 3.2.1 of the ACS guideline",
-  "inclusion_criteria": [
-    {
-      "type": "Diagnosis",
-      "concept_name": "ST-elevation myocardial infarction",
-      "domain_id": "Condition",
-      "mapping_confidence": 0.98,
-      "source_text_span": "patients with ST-elevation myocardial infarction should undergo emergent reperfusion"
-    },
-    {
-      "type": "Measurement",
-      "concept_name": "High-sensitivity cardiac troponin I",
-      "domain_id": "Measurement",
-      "mapping_confidence": 0.92,
-      "test_name": "hs-cTnI",
-      "operator": ">",
-      "value": 99,
-      "unit": "percentile",
-      "source_text_span": "hs-cTn above 99th percentile"
-    },
-    {
-      "type": "Procedure",
-      "concept_name": "Percutaneous coronary intervention",
-      "domain_id": "Procedure",
-      "vocabulary_id": "SNOMED",
-      "mapping_confidence": 0.96,
-      "surgery_name": "Primary PCI",
-      "source_text_span": "PCI within 90 minutes"
-    },
-    {
-      "type": "Drug",
-      "concept_name": "Aspirin",
-      "domain_id": "Drug",
-      "vocabulary_id": "RxNorm",
-      "mapping_confidence": 0.95,
-      "drug_name": "Aspirin 325mg oral",
-      "source_text_span": "initial management includes aspirin"
-    }
-  ],
-  "exclusion_criteria": [
-    {
-      "type": "Diagnosis",
-      "concept_name": "Type 2 myocardial infarction",
-      "domain_id": "Condition",
-      "mapping_confidence": 0.9,
-      "source_text_span": "patients with type 2 MI should not undergo emergent PCI"
-    }
+{{
+  "entities": [
+    {{
+      "text": "diabetes mellitus",
+      "entity_type": "CONDITION",
+      "normalized_text": "diabetes mellitus",
+      "confidence": 0.95,
+      "source_text_span": "patients with diabetes",
+      "metadata": {{
+        "source_dp_id": "{phenotype_id}",
+        "section_reference": "{section_reference}"
+      }}
+    }},
+    {{
+      "text": "metformin",
+      "entity_type": "MEDICATION",
+      "normalized_text": "metformin",
+      "confidence": 0.92,
+      "source_text_span": "metformin therapy",
+      "metadata": {{
+        "source_dp_id": "{phenotype_id}",
+        "section_reference": "{section_reference}"
+      }}
+    }},
+    {{
+      "text": "HbA1c",
+      "entity_type": "MEASUREMENT",
+      "normalized_text": "hemoglobin A1c",
+      "confidence": 0.88,
+      "source_text_span": "HbA1c levels",
+      "metadata": {{
+        "source_dp_id": "{phenotype_id}",
+        "section_reference": "{section_reference}"
+      }}
+    }}
   ]
-}
+}}
 ```
-Additional Notes
-Do not hallucinate OMOP concept names — use the source text and infer CDM-compatible concept names only if clearly mappable.
 
-Ensure each item is clearly supported by guideline text, and cite the source_text_span.
+## Entity Types
+- CONDITION: Diseases, disorders, symptoms
+- MEDICATION: Drugs, medications, treatments
+- PROCEDURE: Medical procedures, surgeries
+- MEASUREMENT: Lab tests, vital signs, measurements
+- DEVICE: Medical devices, equipment
+- ANATOMY: Body parts, anatomical structures
+
+## Guidelines
+1. Extract only medical entities that are clearly mentioned in the DP
+2. Use normalized text that represents standard medical terminology
+3. Provide confidence scores based on clarity of the entity
+4. Include source text spans to show where the entity was found
+5. Do not hallucinate entities - only extract what is explicitly mentioned

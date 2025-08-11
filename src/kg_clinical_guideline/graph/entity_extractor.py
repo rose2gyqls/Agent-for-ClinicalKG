@@ -210,23 +210,44 @@ class EntityExtractor:
         # DP 라벨에서 일반적인 의료 용어 패턴 찾기
         label_lower = dp.label.lower()
         
-        if any(word in label_lower for word in ['diabetes', '당뇨', 'dm']):
+        # 더 구체적인 패턴 매칭
+        if any(word in label_lower for word in ['diabetes', '당뇨', 'dm', 'diabetic']):
             entity_type = EntityType.CONDITION
+            normalized_text = "diabetes mellitus"
+        elif any(word in label_lower for word in ['hypertension', '고혈압', 'htn']):
+            entity_type = EntityType.CONDITION
+            normalized_text = "hypertension"
+        elif any(word in label_lower for word in ['coronary', '심장', 'heart', 'mi', 'infarction']):
+            entity_type = EntityType.CONDITION
+            normalized_text = "coronary artery disease"
+        elif any(word in label_lower for word in ['statin', '스타틴', 'atorvastatin', 'simvastatin']):
+            entity_type = EntityType.MEDICATION
+            normalized_text = "statin"
+        elif any(word in label_lower for word in ['aspirin', '아스피린']):
+            entity_type = EntityType.MEDICATION
+            normalized_text = "aspirin"
         elif any(word in label_lower for word in ['medication', '약물', 'drug', '치료', 'therapy']):
             entity_type = EntityType.MEDICATION
-        elif any(word in label_lower for word in ['test', '검사', 'lab', '측정']):
+            normalized_text = dp.label.lower().strip()
+        elif any(word in label_lower for word in ['test', '검사', 'lab', '측정', 'measurement']):
             entity_type = EntityType.MEASUREMENT
-        elif any(word in label_lower for word in ['procedure', '시술', '수술', 'surgery']):
+            normalized_text = dp.label.lower().strip()
+        elif any(word in label_lower for word in ['procedure', '시술', '수술', 'surgery', 'pci', 'angioplasty']):
             entity_type = EntityType.PROCEDURE
-        elif any(word in label_lower for word in ['symptom', '증상', 'sign']):
+            normalized_text = dp.label.lower().strip()
+        elif any(word in label_lower for word in ['symptom', '증상', 'sign', 'pain', '통증']):
             entity_type = EntityType.SYMPTOM
+            normalized_text = dp.label.lower().strip()
         else:
             entity_type = EntityType.CONDITION  # 기본값
+            normalized_text = dp.label.lower().strip()
+        
+        print(f"✅ 기본 엔티티 생성: {dp.label} -> {entity_type.value} (신뢰도: 0.5)")
         
         return ClinicalEntity(
             text=dp.label,
             entity_type=entity_type,
-            normalized_text=dp.label.lower().strip(),
+            normalized_text=normalized_text,
             confidence=0.5,  # 기본 신뢰도
             metadata={
                 'extraction_method': 'fallback_from_dp_label',
@@ -242,16 +263,25 @@ class EntityExtractor:
             # 엔티티 추출 프롬프트 생성
             prompt = self._create_entity_extraction_prompt(dp)
             
+            print(f"🔍 LLM 엔티티 추출 시작: {dp.dp_id}")
+            
             # LLM 호출
             response = self.llm.generate(prompt)
+            
+            print(f"✅ LLM 응답 받음: {len(response.content)} 문자")
             
             # 응답 파싱
             entities = self._parse_llm_entity_response(response.content, dp)
             
+            print(f"✅ 엔티티 파싱 완료: {len(entities)}개 엔티티")
             return entities
             
         except Exception as e:
             print(f"⚠️ LLM 엔티티 추출 실패: {str(e)}")
+            print(f"   - DP ID: {dp.dp_id}")
+            print(f"   - DP Label: {dp.label}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def _extract_entities_with_rules(self, dp: DigitalPhenotype) -> List[ClinicalEntity]:
@@ -394,23 +424,57 @@ Ensure each item is clearly supported by guideline text, and cite the source_tex
         """LLM 응답에서 엔티티 파싱"""
         try:
             import json
-            from json_repair import repair_json
+            
+            print(f"🔍 LLM 응답 파싱 시작: {len(response_content)} 문자")
             
             # JSON 복구 시도
             try:
                 data = json.loads(response_content)
-            except json.JSONDecodeError:
-                # JSON 복구 시도
-                repaired_json = repair_json(response_content)
-                data = json.loads(repaired_json)
+                print("✅ JSON 파싱 성공")
+            except json.JSONDecodeError as json_error:
+                print(f"⚠️ JSON 파싱 실패: {str(json_error)}")
+                print(f"   - 응답 내용: {response_content[:200]}...")
+                
+                # json_repair 라이브러리 시도
+                try:
+                    from json_repair import repair_json
+                    repaired_json = repair_json(response_content)
+                    data = json.loads(repaired_json)
+                    print("✅ JSON 복구 성공")
+                except Exception as repair_error:
+                    print(f"⚠️ JSON 복구 실패: {str(repair_error)}")
+                    # 기본 엔티티 생성
+                    fallback_entity = self._create_fallback_entity(dp)
+                    return [fallback_entity]
             
             entities = []
             
             if 'entities' in data:
-                for entity_data in data['entities']:
+                print(f"📊 엔티티 데이터 발견: {len(data['entities'])}개")
+                for i, entity_data in enumerate(data['entities']):
                     try:
-                        entity_type = EntityType(entity_data.get('entity_type', 'unknown'))
-                    except ValueError:
+                        entity_type_str = entity_data.get('entity_type', 'unknown').upper()
+                        
+                        # 엔티티 타입 매핑 (대소문자 구분 없이)
+                        type_mapping = {
+                            'CONDITION': EntityType.CONDITION,
+                            'SYMPTOM': EntityType.SYMPTOM,
+                            'PROCEDURE': EntityType.PROCEDURE,
+                            'MEDICATION': EntityType.MEDICATION,
+                            'MEASUREMENT': EntityType.MEASUREMENT,
+                            'DEVICE': EntityType.DEVICE,
+                            'OBSERVATION': EntityType.OBSERVATION,
+                            'ANATOMY': EntityType.ANATOMY,
+                            'UNKNOWN': EntityType.UNKNOWN
+                        }
+                        
+                        if entity_type_str in type_mapping:
+                            entity_type = type_mapping[entity_type_str]
+                        else:
+                            print(f"⚠️ 알 수 없는 엔티티 타입: {entity_type_str}")
+                            entity_type = EntityType.UNKNOWN
+                    except Exception as e:
+                        print(f"⚠️ 엔티티 타입 파싱 오류: {str(e)}")
                         entity_type = EntityType.UNKNOWN
                     
                     entity = ClinicalEntity(
@@ -428,6 +492,11 @@ Ensure each item is clearly supported by guideline text, and cite the source_tex
                     # 신뢰도 임계치 확인
                     if entity.confidence >= self.confidence_threshold:
                         entities.append(entity)
+                        print(f"✅ 엔티티 추가: {entity.text} ({entity.entity_type.value})")
+                    else:
+                        print(f"⚠️ 신뢰도 낮음 제외: {entity.text} (신뢰도: {entity.confidence})")
+            else:
+                print(f"⚠️ 'entities' 키를 찾을 수 없음: {list(data.keys())}")
             
             # 엔티티가 없으면 DP 라벨로부터 기본 엔티티 생성
             if not entities:
@@ -439,6 +508,8 @@ Ensure each item is clearly supported by guideline text, and cite the source_tex
             
         except Exception as e:
             print(f"⚠️ LLM 응답 파싱 실패: {str(e)} - 기본 엔티티 생성")
+            import traceback
+            traceback.print_exc()
             # 파싱 실패 시에도 기본 엔티티 생성
             fallback_entity = self._create_fallback_entity(dp)
             return [fallback_entity]

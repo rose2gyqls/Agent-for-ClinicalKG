@@ -945,4 +945,4 @@ Based on the DP definition above, extract relevant triples in JSON format only."
     @classmethod
     def create_default(cls) -> 'TripleGenerator':
         """기본 설정으로 트리플 생성기 생성"""
-        return cls() 
+        return cls()

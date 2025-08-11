@@ -219,6 +219,11 @@ class OMOPMapper:
     def _map_single_entity(self, entity: ClinicalEntity) -> Optional[EntityMapping]:
         """단일 엔티티를 OMOP CDM에 매핑"""
         
+        # Elasticsearch 클라이언트 확인
+        if not self.es_client or not self.es_client.client:
+            print(f"⚠️ Elasticsearch 클라이언트 없음 - 더미 매핑 생성: {entity.text}")
+            return self._create_dummy_mapping(entity)
+        
         # 1. 엔티티 타입에 따른 도메인 및 어휘체계 결정
         domain_ids = self.entity_to_domain_mapping.get(entity.entity_type, [])
         vocabulary_ids = self.entity_to_vocabulary_mapping.get(entity.entity_type, [])
@@ -244,8 +249,62 @@ class OMOPMapper:
                 entity, synonym_matches, "synonym_match"
             )
         
-        # 5. 매핑 실패
-        return None
+        # 5. 매핑 실패 시 더미 매핑 생성
+        print(f"⚠️ 매핑 실패 - 더미 매핑 생성: {entity.text}")
+        return self._create_dummy_mapping(entity)
+    
+    def _create_dummy_mapping(self, entity: ClinicalEntity) -> EntityMapping:
+        """더미 OMOP 매핑 생성 (Elasticsearch 없을 때 사용)"""
+        
+        # 엔티티 타입에 따른 기본 도메인 설정
+        domain_mapping = {
+            EntityType.CONDITION: "Condition",
+            EntityType.SYMPTOM: "Condition", 
+            EntityType.MEDICATION: "Drug",
+            EntityType.PROCEDURE: "Procedure",
+            EntityType.MEASUREMENT: "Measurement",
+            EntityType.DEVICE: "Device",
+            EntityType.OBSERVATION: "Observation",
+            EntityType.ANATOMY: "Spec Anatomic Site"
+        }
+        
+        vocabulary_mapping = {
+            EntityType.CONDITION: "SNOMED",
+            EntityType.SYMPTOM: "SNOMED",
+            EntityType.MEDICATION: "RxNorm", 
+            EntityType.PROCEDURE: "SNOMED",
+            EntityType.MEASUREMENT: "LOINC",
+            EntityType.DEVICE: "SNOMED",
+            EntityType.OBSERVATION: "SNOMED",
+            EntityType.ANATOMY: "SNOMED"
+        }
+        
+        domain_id = domain_mapping.get(entity.entity_type, "Condition")
+        vocabulary_id = vocabulary_mapping.get(entity.entity_type, "SNOMED")
+        
+        # 더미 OMOP 컨셉 생성
+        dummy_concept = OMOPConcept(
+            concept_id=f"DUMMY_{entity.entity_type.value.upper()}_{hash(entity.text) % 10000}",
+            concept_name=entity.normalized_text,
+            domain_id=domain_id,
+            vocabulary_id=vocabulary_id,
+            concept_class_id="Clinical Finding",
+            standard_concept="S",
+            concept_code=f"DUMMY_{entity.text.replace(' ', '_').upper()}"
+        )
+        
+        # 더미 매핑 생성
+        mapping = EntityMapping(
+            source_entity=entity,
+            omop_concept=dummy_concept,
+            mapping_score=0.3,  # 낮은 신뢰도
+            mapping_confidence=MappingConfidence.LOW,
+            mapping_method="dummy_mapping",
+            alternative_concepts=[]
+        )
+        
+        print(f"✅ 더미 매핑 생성: {entity.text} -> {dummy_concept.concept_name}")
+        return mapping
     
     def _search_exact_matches(
         self,
