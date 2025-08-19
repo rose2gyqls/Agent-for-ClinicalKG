@@ -15,15 +15,10 @@ from ..extraction.prompt_manager import PromptManager
 
 class EntityType(Enum):
     """엔티티 타입"""
-    CONDITION = "condition"
-    SYMPTOM = "symptom"
-    PROCEDURE = "procedure"
-    MEDICATION = "medication"
-    MEASUREMENT = "measurement"
-    DEVICE = "device"
-    OBSERVATION = "observation"
-    ANATOMY = "anatomy"
-    UNKNOWN = "unknown"
+    DIAGNOSTIC = "diagnostic"
+    DRUG = "drug"
+    TEST = "test"
+    SURGERY = "surgery"
 
 
 @dataclass
@@ -210,36 +205,41 @@ class EntityExtractor:
         # DP 라벨에서 일반적인 의료 용어 패턴 찾기
         label_lower = dp.label.lower()
         
-        # 더 구체적인 패턴 매칭
-        if any(word in label_lower for word in ['diabetes', '당뇨', 'dm', 'diabetic']):
-            entity_type = EntityType.CONDITION
-            normalized_text = "diabetes mellitus"
-        elif any(word in label_lower for word in ['hypertension', '고혈압', 'htn']):
-            entity_type = EntityType.CONDITION
-            normalized_text = "hypertension"
-        elif any(word in label_lower for word in ['coronary', '심장', 'heart', 'mi', 'infarction']):
-            entity_type = EntityType.CONDITION
-            normalized_text = "coronary artery disease"
-        elif any(word in label_lower for word in ['statin', '스타틴', 'atorvastatin', 'simvastatin']):
-            entity_type = EntityType.MEDICATION
-            normalized_text = "statin"
-        elif any(word in label_lower for word in ['aspirin', '아스피린']):
-            entity_type = EntityType.MEDICATION
-            normalized_text = "aspirin"
-        elif any(word in label_lower for word in ['medication', '약물', 'drug', '치료', 'therapy']):
-            entity_type = EntityType.MEDICATION
-            normalized_text = dp.label.lower().strip()
-        elif any(word in label_lower for word in ['test', '검사', 'lab', '측정', 'measurement']):
-            entity_type = EntityType.MEASUREMENT
-            normalized_text = dp.label.lower().strip()
-        elif any(word in label_lower for word in ['procedure', '시술', '수술', 'surgery', 'pci', 'angioplasty']):
-            entity_type = EntityType.PROCEDURE
-            normalized_text = dp.label.lower().strip()
-        elif any(word in label_lower for word in ['symptom', '증상', 'sign', 'pain', '통증']):
-            entity_type = EntityType.SYMPTOM
-            normalized_text = dp.label.lower().strip()
+        # 4개 분류에 맞는 패턴 매칭
+        if any(word in label_lower for word in ['diabetes', '당뇨', 'dm', 'diabetic', 'hypertension', '고혈압', 'htn', 'coronary', '심장', 'heart', 'mi', 'infarction', 'disease', '질환', 'condition', '상태']):
+            entity_type = EntityType.DIAGNOSTIC
+            if 'diabetes' in label_lower or '당뇨' in label_lower:
+                normalized_text = "diabetes mellitus"
+            elif 'hypertension' in label_lower or '고혈압' in label_lower:
+                normalized_text = "hypertension"
+            elif 'coronary' in label_lower or '심장' in label_lower:
+                normalized_text = "coronary artery disease"
+            else:
+                normalized_text = dp.label.lower().strip()
+        elif any(word in label_lower for word in ['statin', '스타틴', 'atorvastatin', 'simvastatin', 'aspirin', '아스피린', 'medication', '약물', 'drug', '치료제', 'therapy']):
+            entity_type = EntityType.DRUG
+            if 'statin' in label_lower:
+                normalized_text = "statin"
+            elif 'aspirin' in label_lower:
+                normalized_text = "aspirin"
+            else:
+                normalized_text = dp.label.lower().strip()
+        elif any(word in label_lower for word in ['test', '검사', 'lab', '측정', 'measurement', 'hba1c', 'glucose', 'cholesterol', 'ldl', 'hdl']):
+            entity_type = EntityType.TEST
+            if 'hba1c' in label_lower:
+                normalized_text = "hemoglobin A1c measurement"
+            elif 'glucose' in label_lower:
+                normalized_text = "glucose measurement"
+            else:
+                normalized_text = dp.label.lower().strip()
+        elif any(word in label_lower for word in ['procedure', '시술', '수술', 'surgery', 'pci', 'angioplasty', 'operation', 'intervention']):
+            entity_type = EntityType.SURGERY
+            if 'pci' in label_lower or 'angioplasty' in label_lower:
+                normalized_text = "percutaneous coronary intervention"
+            else:
+                normalized_text = dp.label.lower().strip()
         else:
-            entity_type = EntityType.CONDITION  # 기본값
+            entity_type = EntityType.DIAGNOSTIC  # 기본값
             normalized_text = dp.label.lower().strip()
         
         print(f"✅ 기본 엔티티 생성: {dp.label} -> {entity_type.value} (신뢰도: 0.5)")
@@ -421,7 +421,7 @@ Ensure each item is clearly supported by guideline text, and cite the source_tex
         response_content: str, 
         dp: DigitalPhenotype
     ) -> List[ClinicalEntity]:
-        """LLM 응답에서 엔티티 파싱"""
+        """LLM 응답에서 엔티티 파싱 (4개 분류 형식)"""
         try:
             import json
             
@@ -449,54 +449,47 @@ Ensure each item is clearly supported by guideline text, and cite the source_tex
             
             entities = []
             
-            if 'entities' in data:
-                print(f"📊 엔티티 데이터 발견: {len(data['entities'])}개")
-                for i, entity_data in enumerate(data['entities']):
+            # 4개 분류별로 엔티티 추출
+            entity_types = ['diagnostic', 'drug', 'test', 'surgery']
+            
+            for entity_type in entity_types:
+                if entity_type in data and data[entity_type]:
+                    entity_data = data[entity_type]
+                    
                     try:
-                        entity_type_str = entity_data.get('entity_type', 'unknown').upper()
-                        
-                        # 엔티티 타입 매핑 (대소문자 구분 없이)
+                        # EntityType enum 매핑
                         type_mapping = {
-                            'CONDITION': EntityType.CONDITION,
-                            'SYMPTOM': EntityType.SYMPTOM,
-                            'PROCEDURE': EntityType.PROCEDURE,
-                            'MEDICATION': EntityType.MEDICATION,
-                            'MEASUREMENT': EntityType.MEASUREMENT,
-                            'DEVICE': EntityType.DEVICE,
-                            'OBSERVATION': EntityType.OBSERVATION,
-                            'ANATOMY': EntityType.ANATOMY,
-                            'UNKNOWN': EntityType.UNKNOWN
+                            'diagnostic': EntityType.DIAGNOSTIC,
+                            'drug': EntityType.DRUG,
+                            'test': EntityType.TEST,
+                            'surgery': EntityType.SURGERY
                         }
                         
-                        if entity_type_str in type_mapping:
-                            entity_type = type_mapping[entity_type_str]
+                        entity = ClinicalEntity(
+                            text=entity_data.get('concept_name', ''),
+                            entity_type=type_mapping[entity_type],
+                            normalized_text=entity_data.get('concept_name', '').lower(),
+                            confidence=float(entity_data.get('confidence', 0.5)),
+                            metadata={
+                                'extraction_method': 'llm_based',
+                                'source_dp_id': dp.dp_id,
+                                'source_dp_label': dp.label,
+                                'domain_id': entity_data.get('domain_id', ''),
+                                'vocabulary_id': entity_data.get('vocabulary_id', ''),
+                                'source_text_span': entity_data.get('source_text_span', '')
+                            }
+                        )
+                        
+                        # 신뢰도 임계치 확인
+                        if entity.confidence >= self.confidence_threshold:
+                            entities.append(entity)
+                            print(f"✅ 엔티티 추가: {entity.text} ({entity.entity_type.value})")
                         else:
-                            print(f"⚠️ 알 수 없는 엔티티 타입: {entity_type_str}")
-                            entity_type = EntityType.UNKNOWN
+                            print(f"⚠️ 신뢰도 낮음 제외: {entity.text} (신뢰도: {entity.confidence})")
+                            
                     except Exception as e:
-                        print(f"⚠️ 엔티티 타입 파싱 오류: {str(e)}")
-                        entity_type = EntityType.UNKNOWN
-                    
-                    entity = ClinicalEntity(
-                        text=entity_data.get('text', ''),
-                        entity_type=entity_type,
-                        normalized_text=entity_data.get('normalized_text', entity_data.get('text', '').lower()),
-                        confidence=float(entity_data.get('confidence', 0.5)),
-                        metadata={
-                            'extraction_method': 'llm_based',
-                            'source_dp_id': dp.dp_id,
-                            'source_dp_label': dp.label
-                        }
-                    )
-                    
-                    # 신뢰도 임계치 확인
-                    if entity.confidence >= self.confidence_threshold:
-                        entities.append(entity)
-                        print(f"✅ 엔티티 추가: {entity.text} ({entity.entity_type.value})")
-                    else:
-                        print(f"⚠️ 신뢰도 낮음 제외: {entity.text} (신뢰도: {entity.confidence})")
-            else:
-                print(f"⚠️ 'entities' 키를 찾을 수 없음: {list(data.keys())}")
+                        print(f"⚠️ {entity_type} 엔티티 파싱 오류: {str(e)}")
+                        continue
             
             # 엔티티가 없으면 DP 라벨로부터 기본 엔티티 생성
             if not entities:

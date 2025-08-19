@@ -70,28 +70,20 @@ class OMOPMapper:
         self.confidence_threshold = confidence_threshold
         self.max_alternatives = max_alternatives
         
-        # 엔티티 타입별 OMOP 도메인 매핑
+        # 4개 분류별 OMOP 도메인 매핑
         self.entity_to_domain_mapping = {
-            EntityType.CONDITION: ["Condition"],
-            EntityType.SYMPTOM: ["Condition", "Observation"],
-            EntityType.PROCEDURE: ["Procedure"],
-            EntityType.MEDICATION: ["Drug"],
-            EntityType.MEASUREMENT: ["Measurement"],
-            EntityType.DEVICE: ["Device"],
-            EntityType.OBSERVATION: ["Observation"],
-            EntityType.ANATOMY: ["Spec Anatomic Site"]
+            EntityType.DIAGNOSTIC: ["Condition"],
+            EntityType.DRUG: ["Drug"],
+            EntityType.TEST: ["Measurement"],
+            EntityType.SURGERY: ["Procedure"]
         }
         
-        # 엔티티 타입별 선호 어휘체계
+        # 4개 분류별 선호 어휘체계
         self.entity_to_vocabulary_mapping = {
-            EntityType.CONDITION: ["SNOMED", "ICD10CM", "ICD9CM"],
-            EntityType.SYMPTOM: ["SNOMED", "LOINC"],
-            EntityType.PROCEDURE: ["SNOMED", "ICD10PCS", "CPT4", "HCPCS"],
-            EntityType.MEDICATION: ["RxNorm", "NDC", "SNOMED"],
-            EntityType.MEASUREMENT: ["LOINC", "SNOMED"],
-            EntityType.DEVICE: ["SNOMED"],
-            EntityType.OBSERVATION: ["SNOMED", "LOINC"],
-            EntityType.ANATOMY: ["SNOMED"]
+            EntityType.DIAGNOSTIC: ["SNOMED"],
+            EntityType.DRUG: ["RxNorm"],
+            EntityType.TEST: ["LOINC"],
+            EntityType.SURGERY: ["SNOMED"]
         }
         
         print(f"✅ OMOPMapper 초기화 완료")
@@ -219,8 +211,8 @@ class OMOPMapper:
     def _map_single_entity(self, entity: ClinicalEntity) -> Optional[EntityMapping]:
         """단일 엔티티를 OMOP CDM에 매핑"""
         
-        # Elasticsearch 클라이언트 확인
-        if not self.es_client or not self.es_client.client:
+        # Elasticsearch 클라이언트 확인 (수정: es_client.es_client 사용)
+        if not self.es_client or not self.es_client.es_client:
             print(f"⚠️ Elasticsearch 클라이언트 없음 - 더미 매핑 생성: {entity.text}")
             return self._create_dummy_mapping(entity)
         
@@ -228,55 +220,63 @@ class OMOPMapper:
         domain_ids = self.entity_to_domain_mapping.get(entity.entity_type, [])
         vocabulary_ids = self.entity_to_vocabulary_mapping.get(entity.entity_type, [])
         
+        print(f"🔍 매핑 시도: '{entity.text}' (타입: {entity.entity_type.value})")
+        print(f"  - 도메인: {domain_ids}")
+        print(f"  - 어휘체계: {vocabulary_ids}")
+        
         # 2. 정확 매칭 시도
+        print(f"  📋 정확 매칭 검색 중...")
         exact_matches = self._search_exact_matches(entity, domain_ids, vocabulary_ids)
+        print(f"    결과: {len(exact_matches)}개")
+        
         if exact_matches:
+            print(f"    ✅ 정확 매칭 성공: {exact_matches[0].concept_name}")
             return self._create_mapping_from_search_results(
                 entity, exact_matches, "exact_match"
             )
         
         # 3. 퍼지 매칭 시도
+        print(f"  🔍 퍼지 매칭 검색 중...")
         fuzzy_matches = self._search_fuzzy_matches(entity, domain_ids, vocabulary_ids)
+        print(f"    결과: {len(fuzzy_matches)}개")
+        
         if fuzzy_matches:
+            print(f"    ✅ 퍼지 매칭 성공: {fuzzy_matches[0].concept_name}")
             return self._create_mapping_from_search_results(
                 entity, fuzzy_matches, "fuzzy_match"
             )
         
         # 4. 동의어 매칭 시도
+        print(f"  🔗 동의어 매칭 검색 중...")
         synonym_matches = self._search_synonym_matches(entity, domain_ids, vocabulary_ids)
+        print(f"    결과: {len(synonym_matches)}개")
+        
         if synonym_matches:
+            print(f"    ✅ 동의어 매칭 성공: {synonym_matches[0].concept_name}")
             return self._create_mapping_from_search_results(
                 entity, synonym_matches, "synonym_match"
             )
         
         # 5. 매핑 실패 시 더미 매핑 생성
-        print(f"⚠️ 매핑 실패 - 더미 매핑 생성: {entity.text}")
+        print(f"⚠️ 모든 매핑 방법 실패 - 더미 매핑 생성: {entity.text}")
         return self._create_dummy_mapping(entity)
     
     def _create_dummy_mapping(self, entity: ClinicalEntity) -> EntityMapping:
         """더미 OMOP 매핑 생성 (Elasticsearch 없을 때 사용)"""
         
-        # 엔티티 타입에 따른 기본 도메인 설정
+        # 4개 분류에 따른 기본 도메인 설정
         domain_mapping = {
-            EntityType.CONDITION: "Condition",
-            EntityType.SYMPTOM: "Condition", 
-            EntityType.MEDICATION: "Drug",
-            EntityType.PROCEDURE: "Procedure",
-            EntityType.MEASUREMENT: "Measurement",
-            EntityType.DEVICE: "Device",
-            EntityType.OBSERVATION: "Observation",
-            EntityType.ANATOMY: "Spec Anatomic Site"
+            EntityType.DIAGNOSTIC: "Condition",
+            EntityType.DRUG: "Drug",
+            EntityType.TEST: "Measurement",
+            EntityType.SURGERY: "Procedure"
         }
         
         vocabulary_mapping = {
-            EntityType.CONDITION: "SNOMED",
-            EntityType.SYMPTOM: "SNOMED",
-            EntityType.MEDICATION: "RxNorm", 
-            EntityType.PROCEDURE: "SNOMED",
-            EntityType.MEASUREMENT: "LOINC",
-            EntityType.DEVICE: "SNOMED",
-            EntityType.OBSERVATION: "SNOMED",
-            EntityType.ANATOMY: "SNOMED"
+            EntityType.DIAGNOSTIC: "SNOMED",
+            EntityType.DRUG: "RxNorm",
+            EntityType.TEST: "LOINC",
+            EntityType.SURGERY: "SNOMED"
         }
         
         domain_id = domain_mapping.get(entity.entity_type, "Condition")
@@ -312,23 +312,59 @@ class OMOPMapper:
         domain_ids: List[str],
         vocabulary_ids: List[str]
     ) -> List[SearchResult]:
-        """정확 매칭 검색"""
+        """정확 매칭 검색 (직접 Elasticsearch 쿼리 사용)"""
         try:
-            # 정규화된 텍스트로 검색
-            results = self.es_client.search_concepts(
-                query=entity.normalized_text,
-                domain_ids=domain_ids,
-                vocabulary_ids=vocabulary_ids,
-                standard_concept_only=True,
-                limit=5
+            print(f"    🔍 정확 매칭 검색 시작: '{entity.normalized_text}'")
+            
+            # 간단한 검색 쿼리 (필터 제거, test_elasticsearch_connection.py 방식)
+            search_body = {
+                "query": {
+                    "bool": {
+                        "should": [
+                            {"match": {"concept_name": {"query": entity.normalized_text, "boost": 3.0}}},
+                            {"match": {"concept_code": {"query": entity.normalized_text, "boost": 2.0}}},
+                            {"wildcard": {"concept_name": {"value": f"*{entity.normalized_text}*", "boost": 1.5}}},
+                            {"fuzzy": {"concept_name": {"value": entity.normalized_text, "fuzziness": "AUTO", "boost": 1.0}}}
+                        ],
+                        "minimum_should_match": 1
+                    }
+                },
+                "size": 10,
+                "sort": [{"_score": {"order": "desc"}}]
+            }
+            
+            print(f"      - 간단한 검색 쿼리 사용 (필터 제거)")
+            
+            # 모든 concept 인덱스에서 검색
+            concept_indices = self._get_concept_indices()
+            print(f"      - 검색 인덱스: {concept_indices}")
+            
+            print(f"      - 검색 쿼리 실행 중...")
+            response = self.es_client.es_client.search(
+                index=",".join(concept_indices),
+                body=search_body
             )
+            
+            print(f"      - 검색 응답 받음: {response['hits']['total']['value']}개 결과")
+            
+            # SearchResult로 변환
+            results = self._convert_elasticsearch_response_to_search_results(response)
+            print(f"      - 변환된 결과: {len(results)}개")
             
             # 정확 매칭 필터링 (높은 점수)
             exact_matches = [r for r in results if r.score > 8.0]
+            print(f"      - 정확 매칭 (점수 > 8.0): {len(exact_matches)}개")
+            
+            if exact_matches:
+                print(f"      - 최고 점수: {exact_matches[0].score:.2f}")
+                print(f"      - 최고 결과: {exact_matches[0].concept_name}")
+            
             return exact_matches
             
         except Exception as e:
             print(f"⚠️ 정확 매칭 검색 실패: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def _search_fuzzy_matches(
@@ -337,16 +373,60 @@ class OMOPMapper:
         domain_ids: List[str],
         vocabulary_ids: List[str]
     ) -> List[SearchResult]:
-        """퍼지 매칭 검색"""
+        """퍼지 매칭 검색 (직접 Elasticsearch 쿼리 사용)"""
         try:
-            # 일반 검색 (퍼지 포함)
-            results = self.es_client.search_concepts(
-                query=entity.text,  # 원본 텍스트 사용
-                domain_ids=domain_ids,
-                vocabulary_ids=vocabulary_ids,
-                standard_concept_only=True,
-                limit=5
+            # 직접 Elasticsearch 쿼리 구성
+            search_body = {
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "bool": {
+                                    "should": [
+                                        {"match": {"concept_name": {"query": entity.text, "boost": 3.0}}},
+                                        {"match": {"concept_code": {"query": entity.text, "boost": 2.0}}},
+                                        {"wildcard": {"concept_name": {"value": f"*{entity.text}*", "boost": 1.5}}},
+                                        {"fuzzy": {"concept_name": {"value": entity.text, "fuzziness": "AUTO", "boost": 1.0}}}
+                                    ],
+                                    "minimum_should_match": 1
+                                }
+                            }
+                        ],
+                        "filter": []
+                    }
+                },
+                "size": 10,
+                "sort": [{"_score": {"order": "desc"}}]
+            }
+            
+            # 도메인 필터 추가
+            if domain_ids:
+                search_body["query"]["bool"]["filter"].append({"terms": {"domain_id": domain_ids}})
+            
+            # 어휘체계 필터 추가
+            if vocabulary_ids:
+                search_body["query"]["bool"]["filter"].append({"terms": {"vocabulary_id": vocabulary_ids}})
+            
+            # 표준 컨셉 필터 (선택적)
+            search_body["query"]["bool"]["filter"].append({
+                "bool": {
+                    "should": [
+                        {"term": {"standard_concept": "S"}},
+                        {"bool": {"must_not": {"exists": {"field": "standard_concept"}}}}
+                    ]
+                }
+            })
+            
+            # 모든 concept 인덱스에서 검색
+            concept_indices = self._get_concept_indices()
+            
+            response = self.es_client.es_client.search(
+                index=",".join(concept_indices),
+                body=search_body
             )
+            
+            # SearchResult로 변환
+            results = self._convert_elasticsearch_response_to_search_results(response)
             
             # 중간 점수 결과 필터링
             fuzzy_matches = [r for r in results if 5.0 <= r.score <= 8.0]
@@ -362,16 +442,70 @@ class OMOPMapper:
         domain_ids: List[str],
         vocabulary_ids: List[str]
     ) -> List[SearchResult]:
-        """동의어 매칭 검색"""
+        """동의어 매칭 검색 (직접 Elasticsearch 쿼리 사용)"""
         try:
-            # 동의어 기반 검색을 위한 확장된 검색
-            results = self.es_client.search_concepts(
-                query=entity.text,
-                domain_ids=domain_ids,
-                vocabulary_ids=vocabulary_ids,
-                standard_concept_only=False,  # 비표준 컨셉도 포함
-                limit=10
+            # 동의어 검색을 위한 확장된 쿼리
+            search_body = {
+                "query": {
+                    "bool": {
+                        "should": [
+                            {
+                                "bool": {
+                                    "should": [
+                                        {"match": {"concept_name": {"query": entity.text, "boost": 3.0}}},
+                                        {"wildcard": {"concept_name": {"value": f"*{entity.text}*", "boost": 1.5}}}
+                                    ],
+                                    "minimum_should_match": 1
+                                }
+                            },
+                            # 부분 매칭을 위한 쿼리
+                            {
+                                "bool": {
+                                    "should": [
+                                        {"match": {"concept_name": {"query": entity.text.split()[0], "boost": 2.0}}},
+                                        {"wildcard": {"concept_name": {"value": f"*{entity.text.split()[0]}*", "boost": 1.0}}}
+                                    ],
+                                    "minimum_should_match": 1
+                                }
+                            }
+                        ],
+                        "minimum_should_match": 1,
+                        "filter": []
+                    }
+                },
+                "size": 15,
+                "sort": [{"_score": {"order": "desc"}}]
+            }
+            
+            # 도메인 필터 추가
+            if domain_ids:
+                search_body["query"]["bool"]["filter"].append({"terms": {"domain_id": domain_ids}})
+            
+            # 어휘체계 필터 추가
+            if vocabulary_ids:
+                search_body["query"]["bool"]["filter"].append({"terms": {"vocabulary_id": vocabulary_ids}})
+            
+            # 표준 컨셉 필터 (비표준도 포함)
+            search_body["query"]["bool"]["filter"].append({
+                "bool": {
+                    "should": [
+                        {"term": {"standard_concept": "S"}},
+                        {"bool": {"must_not": {"exists": {"field": "standard_concept"}}}},
+                        {"term": {"standard_concept": "C"}}  # Classification
+                    ]
+                }
+            })
+            
+            # 모든 concept 인덱스에서 검색
+            concept_indices = self._get_concept_indices()
+            
+            response = self.es_client.es_client.search(
+                index=",".join(concept_indices),
+                body=search_body
             )
+            
+            # SearchResult로 변환
+            results = self._convert_elasticsearch_response_to_search_results(response)
             
             # 낮은 점수 결과도 포함 (동의어 매칭용)
             synonym_matches = [r for r in results if r.score >= 2.0]
@@ -380,6 +514,51 @@ class OMOPMapper:
         except Exception as e:
             print(f"⚠️ 동의어 매칭 검색 실패: {str(e)}")
             return []
+    
+    def _get_concept_indices(self) -> List[str]:
+        """사용 가능한 concept 인덱스 목록 반환"""
+        try:
+            indices = self.es_client.es_client.cat.indices(format='json')
+            concept_indices = []
+            
+            for idx in indices:
+                index_name = idx['index']
+                if any(keyword in index_name.lower() for keyword in ['concept', 'omop', 'snomed', 'rxnorm', 'loinc']):
+                    concept_indices.append(index_name)
+            
+            return concept_indices
+        except Exception as e:
+            print(f"⚠️ concept 인덱스 조회 실패: {str(e)}")
+            # 기본값으로 concept-drug 반환
+            return ["concept-drug"]
+    
+    def _convert_elasticsearch_response_to_search_results(self, response: Dict[str, Any]) -> List[SearchResult]:
+        """Elasticsearch 응답을 SearchResult 리스트로 변환"""
+        results = []
+        
+        try:
+            for hit in response['hits']['hits']:
+                source = hit['_source']
+                score = hit['_score']
+                
+                # SearchResult 객체 생성
+                search_result = SearchResult(
+                    concept_id=str(source.get('concept_id', '')),
+                    concept_name=source.get('concept_name', ''),
+                    domain_id=source.get('domain_id', ''),
+                    vocabulary_id=source.get('vocabulary_id', ''),
+                    concept_class_id=source.get('concept_class_id', ''),
+                    standard_concept=source.get('standard_concept', ''),
+                    concept_code=source.get('concept_code', ''),
+                    score=score
+                )
+                
+                results.append(search_result)
+                
+        except Exception as e:
+            print(f"⚠️ 응답 변환 실패: {str(e)}")
+        
+        return results
     
     def _create_mapping_from_search_results(
         self,
@@ -405,8 +584,29 @@ class OMOPMapper:
             concept_code=best_result.concept_code
         )
         
-        # 매핑 점수 정규화 (0-1 범위)
-        normalized_score = min(best_result.score / 10.0, 1.0)
+        # 매핑 점수 정규화 (개선된 버전)
+        # Elasticsearch 점수 범위를 고려한 정규화
+        raw_score = best_result.score
+        
+        # 점수 범위별 정규화 (더 세밀한 구분)
+        if raw_score >= 50.0:
+            # 매우 높은 점수 (50+): 0.95-1.0
+            normalized_score = 0.95 + (raw_score - 50.0) / 100.0
+        elif raw_score >= 20.0:
+            # 높은 점수 (20-49): 0.85-0.95
+            normalized_score = 0.85 + (raw_score - 20.0) / 100.0
+        elif raw_score >= 10.0:
+            # 중간 점수 (10-19): 0.70-0.85
+            normalized_score = 0.70 + (raw_score - 10.0) / 30.0
+        elif raw_score >= 5.0:
+            # 낮은 점수 (5-9): 0.50-0.70
+            normalized_score = 0.50 + (raw_score - 5.0) / 10.0
+        else:
+            # 매우 낮은 점수 (<5): 0.0-0.50
+            normalized_score = raw_score / 10.0
+        
+        # 0-1 범위로 제한
+        normalized_score = max(0.0, min(1.0, normalized_score))
         
         # 매핑 신뢰도 결정
         mapping_confidence = self._determine_mapping_confidence(normalized_score, mapping_method)

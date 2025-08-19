@@ -13,51 +13,42 @@ Extract medical entities (conditions, medications, procedures, measurements, etc
 ## Output Format (JSON)
 ```json
 {{
-  "entities": [
-    {{
-      "text": "diabetes mellitus",
-      "entity_type": "CONDITION",
-      "normalized_text": "diabetes mellitus",
-      "confidence": 0.95,
-      "source_text_span": "patients with diabetes",
-      "metadata": {{
-        "source_dp_id": "{phenotype_id}",
-        "section_reference": "{section_reference}"
-      }}
-    }},
-    {{
-      "text": "metformin",
-      "entity_type": "MEDICATION",
-      "normalized_text": "metformin",
-      "confidence": 0.92,
-      "source_text_span": "metformin therapy",
-      "metadata": {{
-        "source_dp_id": "{phenotype_id}",
-        "section_reference": "{section_reference}"
-      }}
-    }},
-    {{
-      "text": "HbA1c",
-      "entity_type": "MEASUREMENT",
-      "normalized_text": "hemoglobin A1c",
-      "confidence": 0.88,
-      "source_text_span": "HbA1c levels",
-      "metadata": {{
-        "source_dp_id": "{phenotype_id}",
-        "section_reference": "{section_reference}"
-      }}
-    }}
-  ]
+  "diagnostic": {{
+    "concept_name": "diabetes mellitus",
+    "domain_id": "Condition",
+    "vocabulary_id": "SNOMED",
+    "confidence": 0.95,
+    "source_text_span": "patients with diabetes"
+  }},
+  "drug": {{
+    "concept_name": "metformin",
+    "domain_id": "Drug",
+    "vocabulary_id": "RxNorm",
+    "confidence": 0.92,
+    "source_text_span": "metformin therapy"
+  }},
+  "test": {{
+    "concept_name": "hemoglobin A1c measurement",
+    "domain_id": "Measurement",
+    "vocabulary_id": "LOINC",
+    "confidence": 0.88,
+    "source_text_span": "HbA1c levels"
+  }},
+  "surgery": {{
+    "concept_name": "coronary angioplasty",
+    "domain_id": "Procedure",
+    "vocabulary_id": "SNOMED",
+    "confidence": 0.90,
+    "source_text_span": "PCI procedure"
+  }}
 }}
 ```
 
 ## Entity Types
-- CONDITION: Diseases, disorders, symptoms
-- MEDICATION: Drugs, medications, treatments
-- PROCEDURE: Medical procedures, surgeries
-- MEASUREMENT: Lab tests, vital signs, measurements
-- DEVICE: Medical devices, equipment
-- ANATOMY: Body parts, anatomical structures
+- DIAGNOSTIC: Diseases, disorders, conditions, symptoms that need to be diagnosed
+- DRUG: Medications, drugs, therapeutic substances
+- TEST: Laboratory tests, measurements, diagnostic tests
+- SURGERY: Surgical procedures, operations, interventions
 
 ## Guidelines
 1. Extract only medical entities that are clearly mentioned in the DP

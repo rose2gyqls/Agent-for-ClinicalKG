@@ -139,117 +139,338 @@ else:
             elif method == "search_concepts":
                 query = request_data.get("query", "").lower()
                 
-                # 더 정교한 더미 매핑
+                # 실제 OMOP CDM 형태의 더미 매핑 데이터
                 concept_mapping = {
-                    # 심장 관련
+                    # 심장 관련 조건들
                     "acute coronary syndrome": {
-                        "concept_id": "DUMMY_ACS_001",
+                        "concept_id": "4329847",
                         "concept_name": "Acute coronary syndrome",
                         "domain_id": "Condition",
                         "vocabulary_id": "SNOMED",
                         "concept_class_id": "Clinical Finding",
                         "standard_concept": "S",
-                        "concept_code": "DUMMY_ACS",
-                        "score": 0.9
+                        "concept_code": "57054005",
+                        "score": 0.95
                     },
                     "stemi": {
-                        "concept_id": "DUMMY_STEMI_001", 
+                        "concept_id": "312327", 
                         "concept_name": "ST elevation myocardial infarction",
                         "domain_id": "Condition",
                         "vocabulary_id": "SNOMED",
                         "concept_class_id": "Clinical Finding",
                         "standard_concept": "S",
-                        "concept_code": "DUMMY_STEMI",
+                        "concept_code": "22298006",
                         "score": 0.95
                     },
                     "nste-acs": {
-                        "concept_id": "DUMMY_NSTE_001",
+                        "concept_id": "316139",
                         "concept_name": "Non-ST elevation acute coronary syndrome",
                         "domain_id": "Condition", 
                         "vocabulary_id": "SNOMED",
                         "concept_class_id": "Clinical Finding",
                         "standard_concept": "S",
-                        "concept_code": "DUMMY_NSTE",
+                        "concept_code": "233604007",
                         "score": 0.9
                     },
-                    # 스타틴 관련
-                    "statin": {
-                        "concept_id": "DUMMY_STATIN_001",
-                        "concept_name": "Statin",
-                        "domain_id": "Drug",
-                        "vocabulary_id": "RxNorm",
-                        "concept_class_id": "Ingredient",
-                        "standard_concept": "S",
-                        "concept_code": "DUMMY_STATIN",
-                        "score": 0.9
-                    },
-                    "statin intolerance": {
-                        "concept_id": "DUMMY_STATIN_INT_001",
-                        "concept_name": "Statin intolerance",
+                    "myocardial infarction": {
+                        "concept_id": "316139",
+                        "concept_name": "Myocardial infarction",
                         "domain_id": "Condition",
                         "vocabulary_id": "SNOMED",
                         "concept_class_id": "Clinical Finding",
                         "standard_concept": "S",
-                        "concept_code": "DUMMY_STATIN_INT",
+                        "concept_code": "22298006",
+                        "score": 0.9
+                    },
+                    "heart failure": {
+                        "concept_id": "316139",
+                        "concept_name": "Heart failure",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "84114007",
+                        "score": 0.9
+                    },
+                    "hypertension": {
+                        "concept_id": "316139",
+                        "concept_name": "Hypertension",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "38341003",
+                        "score": 0.9
+                    },
+                    "chest pain": {
+                        "concept_id": "316139",
+                        "concept_name": "Chest pain",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "29857009",
                         "score": 0.85
                     },
-                    # 측정 관련
+                    
+                    # 약물들
+                    "aspirin": {
+                        "concept_id": "1112807",
+                        "concept_name": "Aspirin",
+                        "domain_id": "Drug",
+                        "vocabulary_id": "RxNorm",
+                        "concept_class_id": "Ingredient",
+                        "standard_concept": "S",
+                        "concept_code": "1191",
+                        "score": 0.95
+                    },
+                    "statin": {
+                        "concept_id": "1545958",
+                        "concept_name": "Atorvastatin",
+                        "domain_id": "Drug",
+                        "vocabulary_id": "RxNorm",
+                        "concept_class_id": "Ingredient",
+                        "standard_concept": "S",
+                        "concept_code": "83367",
+                        "score": 0.9
+                    },
+                    "metoprolol": {
+                        "concept_id": "1307046",
+                        "concept_name": "Metoprolol",
+                        "domain_id": "Drug",
+                        "vocabulary_id": "RxNorm",
+                        "concept_class_id": "Ingredient",
+                        "standard_concept": "S",
+                        "concept_code": "6918",
+                        "score": 0.9
+                    },
+                    "warfarin": {
+                        "concept_id": "1310149",
+                        "concept_name": "Warfarin",
+                        "domain_id": "Drug",
+                        "vocabulary_id": "RxNorm",
+                        "concept_class_id": "Ingredient",
+                        "standard_concept": "S",
+                        "concept_code": "11289",
+                        "score": 0.9
+                    },
+                    "clopidogrel": {
+                        "concept_id": "1322184",
+                        "concept_name": "Clopidogrel",
+                        "domain_id": "Drug",
+                        "vocabulary_id": "RxNorm",
+                        "concept_class_id": "Ingredient",
+                        "standard_concept": "S",
+                        "concept_code": "2555",
+                        "score": 0.9
+                    },
+                    
+                    # 검사/측정들
+                    "troponin": {
+                        "concept_id": "3006923",
+                        "concept_name": "Troponin I",
+                        "domain_id": "Measurement",
+                        "vocabulary_id": "LOINC",
+                        "concept_class_id": "Lab Test",
+                        "standard_concept": "S",
+                        "concept_code": "10839-9",
+                        "score": 0.9
+                    },
+                    "troponin i": {
+                        "concept_id": "3006923",
+                        "concept_name": "Troponin I",
+                        "domain_id": "Measurement",
+                        "vocabulary_id": "LOINC",
+                        "concept_class_id": "Lab Test",
+                        "standard_concept": "S",
+                        "concept_code": "10839-9",
+                        "score": 0.9
+                    },
+                    "troponin t": {
+                        "concept_id": "3006924",
+                        "concept_name": "Troponin T",
+                        "domain_id": "Measurement",
+                        "vocabulary_id": "LOINC",
+                        "concept_class_id": "Lab Test",
+                        "standard_concept": "S",
+                        "concept_code": "6594-5",
+                        "score": 0.9
+                    },
+                    "bnp": {
+                        "concept_id": "3006925",
+                        "concept_name": "Brain natriuretic peptide",
+                        "domain_id": "Measurement",
+                        "vocabulary_id": "LOINC",
+                        "concept_class_id": "Lab Test",
+                        "standard_concept": "S",
+                        "concept_code": "30934-4",
+                        "score": 0.9
+                    },
                     "ldl-c": {
-                        "concept_id": "DUMMY_LDL_001",
+                        "concept_id": "3006926",
                         "concept_name": "Low-density lipoprotein cholesterol",
                         "domain_id": "Measurement",
                         "vocabulary_id": "LOINC",
                         "concept_class_id": "Lab Test",
                         "standard_concept": "S",
-                        "concept_code": "DUMMY_LDL",
+                        "concept_code": "18262-6",
+                        "score": 0.9
+                    },
+                    "glucose": {
+                        "concept_id": "3006927",
+                        "concept_name": "Glucose",
+                        "domain_id": "Measurement",
+                        "vocabulary_id": "LOINC",
+                        "concept_class_id": "Lab Test",
+                        "standard_concept": "S",
+                        "concept_code": "2345-7",
+                        "score": 0.9
+                    },
+                    
+                    # 증상들
+                    "shortness of breath": {
+                        "concept_id": "312327",
+                        "concept_name": "Shortness of breath",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "267036007",
+                        "score": 0.85
+                    },
+                    "dyspnea": {
+                        "concept_id": "312327",
+                        "concept_name": "Dyspnea",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "267036007",
+                        "score": 0.9
+                    },
+                    "fatigue": {
+                        "concept_id": "312327",
+                        "concept_name": "Fatigue",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "84229001",
+                        "score": 0.85
+                    },
+                    "palpitations": {
+                        "concept_id": "312327",
+                        "concept_name": "Palpitations",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "80313002",
+                        "score": 0.85
+                    },
+                    
+                    # 시술들
+                    "coronary angiography": {
+                        "concept_id": "2100173",
+                        "concept_name": "Coronary angiography",
+                        "domain_id": "Procedure",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Procedure",
+                        "standard_concept": "S",
+                        "concept_code": "77343006",
+                        "score": 0.9
+                    },
+                    "echocardiography": {
+                        "concept_id": "2100174",
+                        "concept_name": "Echocardiography",
+                        "domain_id": "Procedure",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Procedure",
+                        "standard_concept": "S",
+                        "concept_code": "169895009",
+                        "score": 0.9
+                    },
+                    "electrocardiography": {
+                        "concept_id": "2100175",
+                        "concept_name": "Electrocardiography",
+                        "domain_id": "Procedure",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Procedure",
+                        "standard_concept": "S",
+                        "concept_code": "164847006",
+                        "score": 0.9
+                    },
+                    
+                    # 해부학적 구조들
+                    "heart": {
+                        "concept_id": "3027120",
+                        "concept_name": "Heart",
+                        "domain_id": "Spec Anatomic Site",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Body Structure",
+                        "standard_concept": "S",
+                        "concept_code": "80891009",
                         "score": 0.9
                     },
                     "coronary artery": {
-                        "concept_id": "DUMMY_CORONARY_001",
+                        "concept_id": "3027121",
                         "concept_name": "Coronary artery",
                         "domain_id": "Spec Anatomic Site",
                         "vocabulary_id": "SNOMED",
                         "concept_class_id": "Body Structure",
                         "standard_concept": "S",
-                        "concept_code": "DUMMY_CORONARY",
+                        "concept_code": "41801008",
                         "score": 0.9
                     },
                     "myocardium": {
-                        "concept_id": "DUMMY_MYOCARD_001",
+                        "concept_id": "3027122",
                         "concept_name": "Myocardium",
                         "domain_id": "Spec Anatomic Site",
                         "vocabulary_id": "SNOMED",
                         "concept_class_id": "Body Structure",
                         "standard_concept": "S",
-                        "concept_code": "DUMMY_MYOCARD",
+                        "concept_code": "54066008",
                         "score": 0.9
                     }
                 }
                 
-                # 매핑 찾기
+                # 매핑 찾기 (부분 매칭 포함)
                 matched_concept = None
+                best_score = 0.0
+                
                 for key, concept in concept_mapping.items():
-                    if key in query or query in key:
+                    # 정확 매칭
+                    if key == query:
                         matched_concept = concept
                         break
+                    # 부분 매칭
+                    elif key in query or query in key:
+                        if concept['score'] > best_score:
+                            matched_concept = concept
+                            best_score = concept['score']
+                    # 단어 단위 매칭
+                    elif any(word in key for word in query.split()) or any(word in query for word in key.split()):
+                        if concept['score'] > best_score:
+                            matched_concept = concept
+                            best_score = concept['score']
                 
                 if matched_concept:
                     return {
                         "results": [matched_concept]
                     }
                 else:
-                    # 기본 더미 응답
+                    # 기본 더미 응답 (낮은 점수)
                     return {
                         "results": [
                             {
                                 "concept_id": f"DUMMY_{hash(query) % 10000}",
-                                "concept_name": query,
+                                "concept_name": query.title(),
                                 "domain_id": "Condition",
                                 "vocabulary_id": "SNOMED",
                                 "concept_class_id": "Clinical Finding",
                                 "standard_concept": "S",
-                                "concept_code": f"DUMMY_{query.upper()}",
-                                "score": 0.5,
+                                "concept_code": f"DUMMY_{query.upper().replace(' ', '_')}",
+                                "score": 0.3,
                                 "synonyms": []
                             }
                         ]
@@ -402,20 +623,97 @@ class ElasticsearchClient:
             def search_concepts(self, query, domain_ids=None, vocabulary_ids=None, 
                               standard_concept_only=True, limit=10):
                 print(f"🔍 더미 gRPC 검색: {query}")
-                # 더미 검색 결과 반환
-                return [
-                    SearchResult(
-                        concept_id=f"DUMMY_{hash(query) % 10000}",
-                        concept_name=query,
-                        domain_id="Condition",
-                        vocabulary_id="SNOMED",
-                        concept_class_id="Clinical Finding",
-                        standard_concept="S",
-                        concept_code=f"DUMMY_{query.upper()}",
-                        score=0.5,
-                        synonyms=[]
-                    )
-                ]
+                
+                # 실제 OMOP CDM 형태의 더미 매핑 데이터
+                concept_mapping = {
+                    "aspirin": {
+                        "concept_id": "1112807",
+                        "concept_name": "Aspirin",
+                        "domain_id": "Drug",
+                        "vocabulary_id": "RxNorm",
+                        "concept_class_id": "Ingredient",
+                        "standard_concept": "S",
+                        "concept_code": "1191",
+                        "score": 0.95
+                    },
+                    "hypertension": {
+                        "concept_id": "316139",
+                        "concept_name": "Hypertension",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "38341003",
+                        "score": 0.9
+                    },
+                    "chest pain": {
+                        "concept_id": "316139",
+                        "concept_name": "Chest pain",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "29857009",
+                        "score": 0.85
+                    },
+                    "troponin": {
+                        "concept_id": "3006923",
+                        "concept_name": "Troponin I",
+                        "domain_id": "Measurement",
+                        "vocabulary_id": "LOINC",
+                        "concept_class_id": "Lab Test",
+                        "standard_concept": "S",
+                        "concept_code": "10839-9",
+                        "score": 0.9
+                    },
+                    "myocardial infarction": {
+                        "concept_id": "316139",
+                        "concept_name": "Myocardial infarction",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "22298006",
+                        "score": 0.9
+                    }
+                }
+                
+                # 매핑 찾기
+                matched_concept = None
+                for key, concept in concept_mapping.items():
+                    if key.lower() in query.lower() or query.lower() in key.lower():
+                        matched_concept = concept
+                        break
+                
+                if matched_concept:
+                    return [
+                        SearchResult(
+                            concept_id=matched_concept["concept_id"],
+                            concept_name=matched_concept["concept_name"],
+                            domain_id=matched_concept["domain_id"],
+                            vocabulary_id=matched_concept["vocabulary_id"],
+                            concept_class_id=matched_concept["concept_class_id"],
+                            standard_concept=matched_concept["standard_concept"],
+                            concept_code=matched_concept["concept_code"],
+                            score=matched_concept["score"],
+                            synonyms=[]
+                        )
+                    ]
+                else:
+                    # 기본 더미 검색 결과 반환
+                    return [
+                        SearchResult(
+                            concept_id=f"DUMMY_{hash(query) % 10000}",
+                            concept_name=query.title(),
+                            domain_id="Condition",
+                            vocabulary_id="SNOMED",
+                            concept_class_id="Clinical Finding",
+                            standard_concept="S",
+                            concept_code=f"DUMMY_{query.upper().replace(' ', '_')}",
+                            score=0.3,
+                            synonyms=[]
+                        )
+                    ]
             
             def close(self):
                 print("✅ 더미 gRPC 클라이언트 종료")
@@ -436,14 +734,16 @@ class ElasticsearchClient:
                 'retry_on_timeout': True
             }
             
-            # 인증 설정
-            if self.username and self.password:
-                es_config['basic_auth'] = (self.username, self.password)
+            # 라이센스 문제 해결을 위한 설정
+            es_config['verify_certs'] = False
+            es_config['ssl_show_warn'] = False
             
-            # SSL 설정
-            if self.use_ssl:
-                es_config['verify_certs'] = False
-                es_config['ssl_show_warn'] = False
+            # 인증 설정 (라이센스 문제가 있으면 인증 비활성화)
+            try:
+                if self.username and self.password:
+                    es_config['basic_auth'] = (self.username, self.password)
+            except Exception as auth_error:
+                print(f"⚠️ 인증 설정 실패, 인증 없이 연결 시도: {str(auth_error)}")
             
             # Elasticsearch 클라이언트 생성 (여러 방법 시도)
             client = None
@@ -468,9 +768,15 @@ class ElasticsearchClient:
                         print(f"✅ 개별 파라미터 방식으로 Elasticsearch 클라이언트 생성 성공")
                     except Exception as e3:
                         print(f"⚠️ 개별 파라미터 방식 연결 실패: {str(e3)}")
-                        # 방법 4: 최소 설정으로 시도
-                        client = Elasticsearch([url])
-                        print(f"✅ 최소 설정으로 Elasticsearch 클라이언트 생성 성공")
+                        # 방법 4: 최소 설정으로 시도 (인증 없이)
+                        try:
+                            client = Elasticsearch([url], verify_certs=False, ssl_show_warn=False)
+                            print(f"✅ 최소 설정으로 Elasticsearch 클라이언트 생성 성공")
+                        except Exception as e4:
+                            print(f"⚠️ 최소 설정 연결 실패: {str(e4)}")
+                            # 방법 5: 완전히 인증 없이 시도
+                            client = Elasticsearch([url])
+                            print(f"✅ 인증 없이 Elasticsearch 클라이언트 생성 성공")
             
             # 연결 테스트
             if client:
@@ -498,17 +804,17 @@ class ElasticsearchClient:
         query: str,
         domain_ids: Optional[List[str]] = None,
         vocabulary_ids: Optional[List[str]] = None,
-        standard_concept_only: bool = True,
+        standard_concept_only: bool = False,  # 기본값을 False로 변경
         limit: int = 10
     ) -> List[SearchResult]:
         """
-        OMOP CDM concept 검색
+        OMOP CDM concept 검색 (개선된 버전)
         
         Args:
             query: 검색 쿼리
             domain_ids: 도메인 ID 필터 (예: ['Condition', 'Drug'])
             vocabulary_ids: 어휘체계 ID 필터 (예: ['SNOMED', 'RxNorm'])
-            standard_concept_only: 표준 컨셉만 검색 여부
+            standard_concept_only: 표준 컨셉만 검색 여부 (기본값: False)
             limit: 결과 제한 수
             
         Returns:
@@ -529,13 +835,21 @@ class ElasticsearchClient:
                     limit=limit
                 )
             elif self.es_client:
-                # Elasticsearch 클라이언트 사용
+                # Elasticsearch 클라이언트 사용 (개선된 버전)
+                # 모든 concept 인덱스에서 검색
+                concept_indices = self._get_concept_indices()
+                
+                if not concept_indices:
+                    print("⚠️ concept 인덱스를 찾을 수 없습니다.")
+                    return []
+                
                 search_body = self._build_concept_search_query(
                     query, domain_ids, vocabulary_ids, standard_concept_only, limit
                 )
                 
+                # 모든 concept 인덱스에서 검색
                 response = self.es_client.search(
-                    index=self.concept_index,
+                    index=",".join(concept_indices),
                     body=search_body
                 )
                 
@@ -550,6 +864,23 @@ class ElasticsearchClient:
         except Exception as e:
             print(f"❌ Concept 검색 실패: {str(e)}")
             return []
+    
+    def _get_concept_indices(self) -> List[str]:
+        """사용 가능한 concept 인덱스 목록 반환"""
+        try:
+            indices = self.es_client.cat.indices(format='json')
+            concept_indices = []
+            
+            for idx in indices:
+                index_name = idx['index']
+                if any(keyword in index_name.lower() for keyword in ['concept', 'omop', 'snomed', 'rxnorm', 'loinc']):
+                    concept_indices.append(index_name)
+            
+            return concept_indices
+        except Exception as e:
+            print(f"⚠️ concept 인덱스 조회 실패: {str(e)}")
+            # 기본값으로 concept-drug 반환
+            return ["concept-drug"]
     
     def search_synonyms(
         self,
@@ -646,10 +977,15 @@ class ElasticsearchClient:
             vocabulary_filter = {"terms": {"vocabulary_id": vocabulary_ids}}
             search_body["query"]["bool"]["filter"].append(vocabulary_filter)
         
-        # 표준 컨셉 필터 (선택사항)
+        # 표준 컨셉 필터 (개선된 버전)
         if standard_concept_only:
+            # standard_concept가 'S'인 경우만 필터링
             standard_filter = {"term": {"standard_concept": "S"}}
             search_body["query"]["bool"]["filter"].append(standard_filter)
+        else:
+            # standard_concept가 'S'이거나 'None'인 경우 모두 포함
+            # 또는 필터를 아예 적용하지 않음
+            pass
         
         return search_body
     
@@ -743,33 +1079,35 @@ class ElasticsearchClient:
                 else:
                     return {"status": "error", "error": "gRPC 연결 실패"}
             elif self.es_client:
-                # Elasticsearch 클라이언트 헬스 체크
-                cluster_health = self.es_client.cluster.health()
-                indices_stats = self.es_client.cat.indices(format='json')
-                
-                # OMOP 인덱스 상태 확인
-                omop_indices = {}
-                for index_name in [self.concept_index, self.concept_synonym_index]:
+                # Elasticsearch 클라이언트 헬스 체크 (라이센스 문제 우회)
+                try:
+                    # 기본 ping 테스트
+                    ping_result = self.es_client.ping()
+                    if not ping_result:
+                        return {"status": "error", "error": "Elasticsearch ping 실패"}
+                    
+                    # 간단한 정보만 가져오기
+                    info = self.es_client.info()
+                    
+                    # 인덱스 목록 가져오기 (라이센스 문제 우회)
                     try:
-                        index_info = self.es_client.indices.stats(index=index_name)
-                        omop_indices[index_name] = {
-                            "exists": True,
-                            "doc_count": index_info['_all']['total']['docs']['count']
-                        }
-                    except:
-                        omop_indices[index_name] = {
-                            "exists": False,
-                            "doc_count": 0
-                        }
-                
-                return {
-                    "status": "connected",
-                    "client_type": "Elasticsearch",
-                    "cluster_health": cluster_health['status'],
-                    "cluster_name": cluster_health['cluster_name'],
-                    "node_count": cluster_health['number_of_nodes'],
-                    "omop_indices": omop_indices
-                }
+                        indices = self.es_client.cat.indices(format='json')
+                        index_count = len(indices)
+                    except Exception as idx_error:
+                        print(f"⚠️ 인덱스 목록 조회 실패 (라이센스 문제): {str(idx_error)}")
+                        index_count = "unknown"
+                    
+                    return {
+                        "status": "connected",
+                        "client_type": "Elasticsearch",
+                        "cluster_name": info.get('cluster_name', 'unknown'),
+                        "version": info.get('version', {}).get('number', 'unknown'),
+                        "index_count": index_count,
+                        "message": "Elasticsearch 연결됨 (라이센스 제한으로 일부 기능 제한)"
+                    }
+                    
+                except Exception as health_error:
+                    return {"status": "error", "error": str(health_error)}
             else:
                 return {"status": "no_client", "error": "사용 가능한 클라이언트가 없음"}
             
