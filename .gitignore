@@ -97,7 +97,7 @@ docs/_build/
 # Data files
 *.csv
 *.xml
-*.pdf
+# *.pdf
 *.docx
 *.xlsx
 

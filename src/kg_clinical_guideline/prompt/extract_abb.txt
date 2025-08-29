@@ -1,0 +1,26 @@
+You are given a Clinical Practice Guideline (CPG).
+Extract all medical abbreviations (acronyms, ABBR) and their expanded forms from this CPG only.
+Where to look (priority order):
+1) Dedicated “Abbreviations” section (if present).
+2) Figure legends, table captions, footnotes.
+3) Main text using first-definition patterns: “expanded form (ABBR)” or “ABBR (expanded form)”.
+Rules:
+- Output must be in **JSON only** (no prose).
+- Keep original capitalization of abbreviations.
+- Deduplicate identical abbr/full_text pairs, merge all `locations`.
+- If one abbr has multiple expansions, create separate entries.
+- Exclude units (mg/dL, mmHg), symbols (Na⁺), and generic shorthand (vs, i.e., e.g.).
+- Include page numbers or figure/table reference when available.
+- Do not invent expansions. If uncertain, omit.
+Output schema:
+```json
+{
+"source_cpg": "string", "abbreviations": [
+// official CPG title
+{
+"abbr": "string", "full_text": "string", "locations": ["string"] // abbreviation, e.g. "PRA"
+// expansion, e.g. "Plasma Renin Activity"
+// list of where defined, e.g. ["Abbreviations section p.4", "Table 2 caption p.12"]
+}
+]
+}
