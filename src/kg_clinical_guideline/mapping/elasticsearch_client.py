@@ -141,9 +141,49 @@ else:
                 
                 # 실제 OMOP CDM 형태의 더미 매핑 데이터
                 concept_mapping = {
-                    # 심장 관련 조건들
+                    # 심장 관련 조건들 (정확한 ATHENA concept_id 사용)
                     "acute coronary syndrome": {
-                        "concept_id": "4329847",
+                        "concept_id": "4215140",
+                        "concept_name": "Acute coronary syndrome",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "57054005",
+                        "score": 0.95
+                    },
+                    "acute coronary syndromes": {
+                        "concept_id": "4215140",
+                        "concept_name": "Acute coronary syndrome",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "57054005",
+                        "score": 0.95
+                    },
+                    "acute coronary syndromes (acs)": {
+                        "concept_id": "4215140",
+                        "concept_name": "Acute coronary syndrome",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "57054005",
+                        "score": 0.95
+                    },
+                    "acute coronary syndromes": {
+                        "concept_id": "4215140",
+                        "concept_name": "Acute coronary syndrome",
+                        "domain_id": "Condition",
+                        "vocabulary_id": "SNOMED",
+                        "concept_class_id": "Clinical Finding",
+                        "standard_concept": "S",
+                        "concept_code": "57054005",
+                        "score": 0.95
+                    },
+                    "acs": {
+                        "concept_id": "4215140",
                         "concept_name": "Acute coronary syndrome",
                         "domain_id": "Condition",
                         "vocabulary_id": "SNOMED",
@@ -434,46 +474,68 @@ else:
                     }
                 }
                 
-                # 매핑 찾기 (부분 매칭 포함)
+                # 매핑 찾기 (정확한 매칭 우선)
                 matched_concept = None
                 best_score = 0.0
                 
+                # ACS 관련 특별 처리
+                query_lower = query.lower()
+                is_acs_query = any(term in query_lower for term in ["acute coronary", "acs"])
+                
                 for key, concept in concept_mapping.items():
-                    # 정확 매칭
-                    if key == query:
+                    key_lower = key.lower()
+                    
+                    # 정확 매칭 (가장 높은 우선순위)
+                    if key_lower == query_lower:
                         matched_concept = concept
                         break
-                    # 부분 매칭
-                    elif key in query or query in key:
+                    
+                    # ACS 관련 쿼리인 경우 특별 처리
+                    if is_acs_query:
+                        # ACS 관련 매핑 우선
+                        if "acute coronary syndrome" in key_lower:
+                            matched_concept = concept
+                            best_score = concept['score']
+                            continue
+                        # ACS 관련이 아닌 coronary 매핑은 제외
+                        elif "coronary artery" in key_lower and "acute" not in key_lower:
+                            continue
+                    
+                    # 부분 매칭 (더 정확한 매칭 우선)
+                    elif key_lower in query_lower or query_lower in key_lower:
                         if concept['score'] > best_score:
                             matched_concept = concept
                             best_score = concept['score']
-                    # 단어 단위 매칭
-                    elif any(word in key for word in query.split()) or any(word in query for word in key.split()):
+                    
+                    # 단어 단위 매칭 (가장 낮은 우선순위)
+                    elif any(word in key_lower for word in query_lower.split()) or any(word in query_lower for word in key_lower.split()):
+                        # ACS 관련 쿼리인 경우 coronary artery는 제외
+                        if is_acs_query and "coronary artery" in key_lower and "acute" not in key_lower:
+                            continue
                         if concept['score'] > best_score:
                             matched_concept = concept
                             best_score = concept['score']
                 
                 if matched_concept:
+                    # Elasticsearch 형식으로 응답
                     return {
-                        "results": [matched_concept]
+                        "hits": {
+                            "total": {"value": 1},
+                            "hits": [
+                                {
+                                    "_score": matched_concept.get("score", 0.5) * 1000,
+                                    "_source": matched_concept
+                                }
+                            ]
+                        }
                     }
                 else:
-                    # 기본 더미 응답 (낮은 점수)
+                    # 매칭되지 않은 경우 빈 결과 반환
                     return {
-                        "results": [
-                            {
-                                "concept_id": f"DUMMY_{hash(query) % 10000}",
-                                "concept_name": query.title(),
-                                "domain_id": "Condition",
-                                "vocabulary_id": "SNOMED",
-                                "concept_class_id": "Clinical Finding",
-                                "standard_concept": "S",
-                                "concept_code": f"DUMMY_{query.upper().replace(' ', '_')}",
-                                "score": 0.3,
-                                "synonyms": []
-                            }
-                        ]
+                        "hits": {
+                            "total": {"value": 0},
+                            "hits": []
+                        }
                     }
             return {}
         

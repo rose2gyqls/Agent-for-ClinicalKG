@@ -33,7 +33,7 @@ def test_single_entity_mapping():
         print(f"  - 매핑: {result.mapped_concept_name}")
         print(f"  - 도메인: {result.domain_id}")
         print(f"  - 어휘체계: {result.vocabulary_id}")
-        print(f"  - 점수: {result.mapping_score:.3f}")
+        print(f"  - 점수: {result.mapping_score:.3f} (0.0~1.0 정규화)")
         print(f"  - 신뢰도: {result.mapping_confidence}")
     else:
         print("❌ 매핑 실패")
@@ -127,28 +127,65 @@ def test_llm_analysis_mapping():
     print()
 
 def get_medical_terms() -> List[str]:
-    """이미지에서 추출한 100개 의료 용어 리스트"""
+    """심장질환 관련 의료 용어 리스트"""
     return [
-        "anxiety", "event recorder", "coronary angiography", "heart", "pulmonary valve",
-        "nifedipine", "propafenone", "bradycardia", "clopidogrel", "nausea",
-        "aspirin", "thrombectomy", "aorta", "rivaroxaban", "prothrombin time",
-        "coronary artery disease", "high-density lipoprotein", "tricuspid valve", "bicarbonate", "cardioversion",
-        "atrial fibrillation", "chloride", "glycated hemoglobin", "troponin T", "ticagrelor",
-        "insomnia", "slow heartbeat", "echocardiography", "cardiac resynchronization therapy", "sotalol",
-        "right atrium", "atenolol", "troponin I", "mitral regurgitation", "ventricular tachycardia",
-        "candesartan", "low-density lipoprotein", "depression", "activated partial thromboplastin time", "headache",
-        "aortic valve", "ramipril", "blood urea nitrogen", "coronary artery bypass grafting", "losartan",
-        "erythrocyte sedimentation rate", "pulmonary artery", "acute coronary syndrome", "non-ST elevation ACS", "stable angina",
-        "cardiac CT", "pacemaker implantation", "Holter monitoring", "vomiting", "implantable loop recorder",
-        "diltiazem", "dizziness", "international normalized ratio", "palpitations", "cardiomyopathy",
-        "hemoglobin", "epicardium", "sacubitril", "glucose", "edoxaban",
-        "aortic stenosis", "mitral valve", "apixaban", "heart failure", "irregular heartbeat",
-        "left anterior descending artery", "myocardium", "syncope", "valsartan", "endocarditis",
-        "platelet count", "right coronary artery", "lisinopril", "aspartate aminotransferase", "confusion",
-        "chest pain", "unstable angina", "right ventricle", "amlodipine", "sodium",
-        "cough", "creatinine", "cardiac MRI", "flecainide", "heparin",
-        "dyspnea", "ivabradine", "coronary artery", "total cholesterol", "arm pain",
-        "jaw pain", "neck pain", "NT-proBNP", "back pain", "BNP"
+        # Diagnostic (진단)
+        "Acute Coronary Syndromes (ACS)",
+        "Myocardial Infarction (MI)",
+        "ST-segment elevation myocardial infarction (STEMI)",
+        "Non–ST-segment elevation myocardial infarction (NSTEMI)",
+        "Unstable Angina",
+        "Myocardial Ischemia",
+        "Heart Failure (HF)",
+        "Arrhythmias",
+        "Cardiac Arrest",
+        "Chest Pain",
+        "Coronary Artery Thrombosis",
+        "Atherosclerotic Plaque",
+        "Plaque Rupture",
+        "Multivessel Disease (MVD)",
+        "Chronic Coronary Disease (CCD)",
+        "Coronary Artery Spasm",
+        "Spontaneous Coronary Artery Dissection",
+        "MINOCA (MI with nonobstructive coronary artery disease)",
+        "Myonecrosis",
+        "Embolism",
+        "Left Ventricular Hypertrophy",
+        "Acute Pericarditis",
+        "Brugada Syndrome",
+        "Takotsubo Syndrome",
+        "Left Bundle Branch Block (LBBB)",
+        "ST-segment Elevation",
+        "ST-segment Depression",
+        "T-wave Inversion",
+        
+        # Drug (약물)
+        "Unfractionated Heparin (UFH)",
+        "Proton Pump Inhibitor (PPI)",
+        "SGLT-2 (sodium-glucose cotransporter-2) inhibitors",
+        "GLP-1 (glucagon-like peptide-1) agonists",
+        "Fibrinolytic Treatment",
+        
+        # Test (검사)
+        "12-lead ECG (electrocardiogram)",
+        "Cardiac Troponin (cTn)",
+        "High-sensitivity Cardiac Troponin (hs-cTn)",
+        "Intravascular Ultrasound (IVUS)",
+        "Optical Coherence Tomography (OCT)",
+        "Physical Examination",
+        "Vital Signs Assessment",
+        
+        # Surgery (수술/시술)
+        "Percutaneous Coronary Intervention (PCI)",
+        "Primary Percutaneous Coronary Intervention (PPCI)",
+        "Cardiac Catheterization",
+        "Implantable Cardioverter-Defibrillator (ICD)",
+        "Intra-aortic Balloon Pump (IABP)",
+        "Mechanical Circulatory Support (MCS)",
+        "Venoarterial Extracorporeal Membrane Oxygenation (VA-ECMO)",
+        "Reperfusion",
+        "Defibrillation",
+        "Right Ventricular Pacing"
     ]
 
 
@@ -158,32 +195,29 @@ def classify_medical_term(term: str) -> str:
     
     # 진단/질환 관련
     diagnostic_keywords = [
-        'disease', 'syndrome', 'failure', 'fibrillation', 'tachycardia', 'bradycardia',
-        'angina', 'stenosis', 'regurgitation', 'cardiomyopathy', 'endocarditis',
-        'pain', 'anxiety', 'depression', 'insomnia', 'confusion', 'dizziness',
-        'nausea', 'vomiting', 'cough', 'dyspnea', 'syncope', 'palpitations'
+        'syndrome', 'infarction', 'angina', 'ischemia', 'failure', 'arrhythmia',
+        'arrest', 'pain', 'thrombosis', 'plaque', 'rupture', 'disease',
+        'spasm', 'dissection', 'necrosis', 'embolism', 'hypertrophy',
+        'pericarditis', 'block', 'elevation', 'depression', 'inversion'
     ]
     
     # 약물 관련
     drug_keywords = [
-        'aspirin', 'clopidogrel', 'ticagrelor', 'nifedipine', 'propafenone', 'sotalol',
-        'atenolol', 'candesartan', 'ramipril', 'losartan', 'diltiazem', 'amlodipine',
-        'flecainide', 'heparin', 'rivaroxaban', 'edoxaban', 'apixaban', 'valsartan',
-        'lisinopril', 'sacubitril', 'ivabradine'
+        'heparin', 'inhibitor', 'sglt-2', 'glp-1', 'agonist', 'fibrinolytic',
+        'treatment', 'ufh', 'ppi'
     ]
     
     # 검사/측정 관련
     test_keywords = [
-        'hemoglobin', 'glucose', 'creatinine', 'sodium', 'chloride', 'bicarbonate',
-        'troponin', 'BNP', 'prothrombin', 'thromboplastin', 'cholesterol', 'sedimentation',
-        'aminotransferase', 'urea nitrogen', 'platelet count', 'ratio', 'monitoring',
-        'echocardiography', 'angiography', 'CT', 'MRI'
+        'ecg', 'electrocardiogram', 'troponin', 'ultrasound', 'tomography',
+        'examination', 'assessment', 'signs', 'ivus', 'oct'
     ]
     
     # 수술/시술 관련
     surgery_keywords = [
-        'thrombectomy', 'cardioversion', 'resynchronization', 'implantation', 'bypass',
-        'grafting', 'monitoring', 'recorder', 'pacemaker', 'loop recorder'
+        'intervention', 'catheterization', 'implantable', 'defibrillator',
+        'balloon', 'pump', 'support', 'ecmo', 'reperfusion', 'defibrillation',
+        'pacing', 'pci', 'ppci', 'icd', 'iabp', 'mcs', 'va-ecmo'
     ]
     
     # 키워드 매칭으로 분류
@@ -200,13 +234,13 @@ def classify_medical_term(term: str) -> str:
         return "diagnostic"
 
 
-def test_100_medical_terms_mapping():
-    """100개 의료 용어 매핑 테스트 및 CSV 출력"""
-    print("=== 100개 의료 용어 매핑 테스트 ===")
+def test_cardiac_medical_terms_mapping():
+    """심장질환 관련 의료 용어 매핑 테스트 및 CSV 출력"""
+    print("=== 심장질환 관련 의료 용어 매핑 테스트 ===")
     
     # 의료 용어 리스트 가져오기
     medical_terms = get_medical_terms()
-    print(f"총 {len(medical_terms)}개의 의료 용어를 매핑합니다...")
+    print(f"총 {len(medical_terms)}개의 심장질환 관련 의료 용어를 매핑합니다...")
     
     # API 초기화
     api = EntityMappingAPI()
@@ -262,7 +296,7 @@ def test_100_medical_terms_mapping():
         time.sleep(0.1)
     
     # CSV 파일로 결과 저장
-    csv_filename = f"medical_terms_mapping_results_{int(time.time())}.csv"
+    csv_filename = f"cardiac_medical_terms_mapping_results_{int(time.time())}.csv"
     
     with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = [
@@ -303,7 +337,7 @@ def test_100_medical_terms_mapping():
     
     # 상위 매핑 점수 결과
     high_score_results = [r for r in successful_mappings if r['mapping_score'] > 0.8]
-    print(f"\n=== 고점수 매핑 (점수 > 0.8) ===")
+    print(f"\n=== 고점수 매핑 (점수 > 0.8, 0.0~1.0 정규화) ===")
     print(f"고점수 매핑 수: {len(high_score_results)}")
     
     for result in sorted(high_score_results, key=lambda x: x['mapping_score'], reverse=True)[:10]:
@@ -327,15 +361,15 @@ def test_api_health_check():
 
 
 if __name__ == "__main__":
-    print("🔍 100개 의료 용어 엔티티 매핑 API 테스트 시작")
+    print("🔍 심장질환 관련 의료 용어 엔티티 매핑 API 테스트 시작")
     print()
     
     try:
         # API 상태 확인
         test_api_health_check()
         
-        # 100개 의료 용어 매핑 테스트
-        results, csv_file = test_100_medical_terms_mapping()
+        # 심장질환 관련 의료 용어 매핑 테스트
+        results, csv_file = test_cardiac_medical_terms_mapping()
         
         print(f"\n✅ 테스트 완료! 결과가 {csv_file} 파일에 저장되었습니다.")
         
