@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 엔티티 매핑 API 테스트 코드
-두 개의 엔티티에 대해 5단계별로 후보군과 점수를 확인
+두 개의 엔티티에 대해 6단계별로 후보군과 점수를 확인
 """
 
 import sys
@@ -34,10 +34,10 @@ class EntityMappingTester:
         self.api = EntityMappingAPI()
         logger.info("✅ EntityMappingTester 초기화 완료")
     
-    def test_entity_mapping_5_steps(self, entity_name: str, entity_type: str, 
+    def test_entity_mapping_6_steps(self, entity_name: str, entity_type: str, 
                                    golden_concept_id: str, golden_concept_name: str) -> None:
         """
-        엔티티 매핑을 5단계별로 상세 테스트
+        엔티티 매핑을 6단계별로 상세 테스트
         
         Args:
             entity_name: 테스트할 엔티티 이름
@@ -142,61 +142,127 @@ class EntityMappingTester:
             
             print()
         
-        # ===== 4단계: Python 유사도 재계산 → 최적 후보 선택 =====
-        print(f"🐍 4단계: Python 유사도 재계산 → 최적 후보 선택")
+        # ===== 4단계: Non-standard → Standard 후보 조회 및 임시 저장 =====
+        print(f"🔗 4단계: Non-standard → Standard 후보 조회 및 임시 저장")
         print(f"{'='*60}")
         
-        # Non-standard 후보들의 Standard 후보들과 유사도 재계산
+        # Non-standard 후보들의 Standard 후보들을 임시로 저장
+        non_standard_to_standard_mappings = []
+        
         for i, candidate in enumerate(non_standard_candidates, 1):
             source = candidate['_source']
             concept_id = str(source.get('concept_id', ''))
+            print(f"  Non-standard {i}: {source.get('concept_name', 'N/A')} (ID: {concept_id})")
+            
             standard_candidates_from_non = self.api._get_standard_candidates(concept_id, entity_info["domain_id"])
             
             if standard_candidates_from_non:
-                best_standard = self.api._find_best_standard_candidate(entity_input, standard_candidates_from_non)
-                if best_standard:
-                    similarity_score = best_standard.get('similarity_score', 0)
-                    print(f"  Non-standard {i}: {source.get('concept_name', 'N/A')}")
-                    print(f"    → 최적 Standard: {best_standard.get('concept_name', 'N/A')}")
-                    print(f"    → 유사도 점수: {similarity_score:.3f}")
-                    
-                    all_standard_candidates.append({
-                        'concept': best_standard,
-                        'final_score': similarity_score,
-                        'is_original_standard': False,
-                        'original_non_standard': source,
-                        'original_candidate': candidate
-                    })
-                    print()
+                print(f"    → Maps to 관계로 {len(standard_candidates_from_non)}개 Standard 후보 발견")
+                for j, std_candidate in enumerate(standard_candidates_from_non[:3], 1):  # 상위 3개만 출력
+                    print(f"      {j}. {std_candidate.get('concept_name', 'N/A')} (ID: {std_candidate.get('concept_id', 'N/A')}")
+                
+                # 모든 Standard 후보들을 임시 저장 (나중에 유사도 재계산)
+                non_standard_to_standard_mappings.append({
+                    'non_standard_source': source,
+                    'non_standard_candidate': candidate,
+                    'standard_candidates': standard_candidates_from_non
+                })
+            else:
+                print(f"    → Maps to 관계 없음")
+            
+            print()
         
-        # ===== 5단계: 점수 정규화 (0.0~1.0) → 최종 매핑 결과 =====
-        print(f"📊 5단계: 점수 정규화 (0.0~1.0) → 최종 매핑 결과")
+        # ===== 5단계: 모든 후보군에 대해 Python 유사도 재계산 → Re-ranking =====
+        print(f"🐍 5단계: 모든 후보군에 대해 Python 유사도 재계산 → Re-ranking")
+        print(f"{'='*60}")
+        
+        all_standard_candidates = []
+        
+        # 1. Standard 후보들에 대해 Python 유사도 재계산
+        print("  📊 Standard 후보들 Python 유사도 재계산:")
+        for i, candidate in enumerate(standard_candidates, 1):
+            source = candidate['_source']
+            original_score = candidate['_score']
+            
+            # Python 유사도 재계산
+            python_similarity = self.api._calculate_similarity(preprocessed_name, source.get('concept_name', ''))
+            
+            print(f"    {i}. {source.get('concept_name', 'N/A')}")
+            print(f"       Elasticsearch 점수: {original_score:.2f}")
+            print(f"       Python 유사도: {python_similarity:.3f}")
+            
+            all_standard_candidates.append({
+                'concept': source,
+                'final_score': python_similarity,  # Python 유사도 사용
+                'is_original_standard': True,
+                'original_candidate': candidate,
+                'elasticsearch_score': original_score,
+                'python_similarity': python_similarity
+            })
+            print()
+        
+        # 2. Non-standard → Standard 후보들에 대해 Python 유사도 재계산
+        print("  📊 Non-standard → Standard 후보들 Python 유사도 재계산:")
+        for i, mapping in enumerate(non_standard_to_standard_mappings, 1):
+            non_standard_source = mapping['non_standard_source']
+            non_standard_candidate = mapping['non_standard_candidate']
+            standard_candidates_list = mapping['standard_candidates']
+            
+            print(f"    Non-standard {i}: {non_standard_source.get('concept_name', 'N/A')}")
+            
+            for j, std_candidate in enumerate(standard_candidates_list, 1):
+                # Python 유사도 재계산
+                python_similarity = self.api._calculate_similarity(preprocessed_name, std_candidate.get('concept_name', ''))
+                
+                print(f"      Standard {j}: {std_candidate.get('concept_name', 'N/A')}")
+                print(f"        Python 유사도: {python_similarity:.3f}")
+                
+                all_standard_candidates.append({
+                    'concept': std_candidate,
+                    'final_score': python_similarity,  # Python 유사도 사용
+                    'is_original_standard': False,
+                    'original_non_standard': non_standard_source,
+                    'original_candidate': non_standard_candidate,
+                    'python_similarity': python_similarity
+                })
+            
+            print()
+        
+        # ===== 6단계: 점수 정규화 (0.0~1.0) → 최종 매핑 결과 =====
+        print(f"📊 6단계: 점수 정규화 (0.0~1.0) → 최종 매핑 결과")
         print(f"{'='*60}")
         
         if not all_standard_candidates:
             print("❌ 처리된 후보 없음")
             return
         
-        # 점수별 정렬
+        # 점수별 정렬 (Python 유사도 기준)
         sorted_candidates = sorted(all_standard_candidates, key=lambda x: x['final_score'], reverse=True)
         
-        print("최종 후보 순위:")
+        print("최종 후보 순위 (Python 유사도 기준):")
         for i, candidate in enumerate(sorted_candidates, 1):
             concept = candidate['concept']
-            final_score = candidate['final_score']
+            final_score = candidate['final_score']  # Python 유사도 점수
             is_standard = candidate['is_original_standard']
             mapping_type = "직접 Standard" if is_standard else "Non-standard → Standard"
             
-            # 점수 정규화
+            # 점수 정규화 (Python 유사도는 이미 0~1 사이이므로 그대로 사용)
             normalized_score = self.api._normalize_score(final_score)
             confidence = self.api._determine_confidence(normalized_score)
             
-            print(f"  {i}. 원본 점수: {final_score:.3f} → 정규화: {normalized_score:.3f} ({confidence})")
+            print(f"  {i}. Python 유사도: {final_score:.3f} → 정규화: {normalized_score:.3f} ({confidence})")
             print(f"     컨셉 ID: {concept.get('concept_id', 'N/A')}")
             print(f"     컨셉명: {concept.get('concept_name', 'N/A')}")
             print(f"     도메인: {concept.get('domain_id', 'N/A')}")
             print(f"     어휘체계: {concept.get('vocabulary_id', 'N/A')}")
             print(f"     매핑 방법: {mapping_type}")
+            
+            # 추가 정보 출력
+            if is_standard and 'elasticsearch_score' in candidate:
+                print(f"     Elasticsearch 점수: {candidate['elasticsearch_score']:.2f}")
+            elif not is_standard and 'python_similarity' in candidate:
+                print(f"     Python 유사도: {candidate['python_similarity']:.3f}")
+            
             print()
         
         # 골든셋과 비교
@@ -229,7 +295,7 @@ def main():
     print("\n" + "="*80)
     print("📋 테스트 케이스 1: ST-segment elevation myocardial infarction (STEMI)")
     print("="*80)
-    tester.test_entity_mapping_5_steps(
+    tester.test_entity_mapping_6_steps(
         entity_name="ST-segment elevation myocardial infarction (STEMI)",
         entity_type="diagnostic",
         golden_concept_id="4296653",
@@ -240,7 +306,7 @@ def main():
     print("\n" + "="*80)
     print("📋 테스트 케이스 2: Acute Coronary Syndromes (ACS)")
     print("="*80)
-    tester.test_entity_mapping_5_steps(
+    tester.test_entity_mapping_6_steps(
         entity_name="Acute Coronary Syndromes (ACS)",
         entity_type="diagnostic",
         golden_concept_id="4215140",

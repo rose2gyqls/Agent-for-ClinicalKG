@@ -18,9 +18,19 @@ logger = logging.getLogger(__name__)
 class EntityTypeAPI(Enum):
     """API용 엔티티 타입"""
     DIAGNOSTIC = "diagnostic"
-    DRUG = "drug"
     TEST = "test"
     SURGERY = "surgery"
+    ##
+    PROCEDURE = "procedure"
+    CONDITION = "condition"
+    DRUG = "drug"
+    OBSERVATION = "observation"
+    MEASUREMENT = "measurement"
+    THRESHOLD = "threshold"
+    DEMOGRAPHICS = "demographics"
+    PERIOD = "period"
+    PROVIDER = "provider"
+
 
 
 @dataclass
@@ -53,10 +63,15 @@ class MappingResult:
 def get_es_index(domain_id: str) -> str:
     """도메인 ID에 따른 Elasticsearch 인덱스 반환"""
     domain_to_index = {
+        "Procedure": "concept-procedure",
         "Condition": "concept-condition",
-        "Drug": "concept-drug", 
+        "Drug": "concept-drug",
+        "Observation": "concept-observation",
         "Measurement": "concept-measurement",
-        "Procedure": "concept-procedure"
+        "Threshold": "threshold",
+        "Demographics": "demographics",
+        "Period": "period",
+        "Provider": "concept-provider"
     }
     return domain_to_index.get(domain_id, "concept-condition")
 
@@ -109,7 +124,10 @@ class EntityMappingAPI:
         """
         단일 엔티티를 OMOP CDM에 매핑
         1. Standard 여부와 상관없이 유사도 기반 검색
-        2. Non-standard인 경우 standard 후보들과 재매칭
+        2. Standard/Non-standard 분류 및 Non-standard → Standard 후보 조회
+        3. 모든 후보군에 대해 Python 유사도 재계산 → Re-ranking
+        4. Python 유사도 기준으로 정렬하여 최고 점수 선택
+        5. 매핑 결과 생성
         
         Args:
             entity_input: 매핑할 엔티티 정보
@@ -146,45 +164,86 @@ class EntityMappingAPI:
                 return None
             
             # 2단계: Standard/Non-standard 분류 및 처리
-            processed_candidates = []
+            # Standard 후보들과 Non-standard → Standard 후보들을 분리하여 처리
+            standard_candidates = []
+            non_standard_to_standard_mappings = []
             
             for candidate in candidates:
                 source = candidate['_source']
                 if source.get('standard_concept') == 'S':
-                    # Standard 엔티티: 바로 사용
-                    processed_candidates.append({
-                        'concept': source,
-                        'final_score': candidate['_score'],
-                        'is_original_standard': True,
-                        'original_candidate': candidate
+                    # Standard 엔티티: 임시 저장 (나중에 Python 유사도 재계산)
+                    standard_candidates.append({
+                        'candidate': candidate,
+                        'source': source
                     })
                 else:
-                    # Non-standard 엔티티: Standard 후보들 조회 후 재계산
+                    # Non-standard 엔티티: Standard 후보들 조회 후 임시 저장
                     concept_id = str(source.get('concept_id', ''))
-                    standard_candidates = self._get_standard_candidates(concept_id, domain_id)
+                    standard_candidates_from_non = self._get_standard_candidates(concept_id, domain_id)
                     
-                    if standard_candidates:
-                        best_standard = self._find_best_standard_candidate(
-                            entity_input, standard_candidates
-                        )
-                        if best_standard:
-                            processed_candidates.append({
-                                'concept': best_standard,
-                                'final_score': best_standard.get('similarity_score', 0),
-                                'is_original_standard': False,
-                                'original_non_standard': source,
-                                'original_candidate': candidate
-                            })
+                    if standard_candidates_from_non:
+                        non_standard_to_standard_mappings.append({
+                            'non_standard_source': source,
+                            'non_standard_candidate': candidate,
+                            'standard_candidates': standard_candidates_from_non
+                        })
             
-            # 3단계: 최종 점수로 정렬하여 최고 점수 선택
-            if not processed_candidates:
+            # 3단계: 모든 후보군에 대해 Python 유사도 재계산 → Re-ranking
+            all_standard_candidates = []
+            
+            # 3-1. Standard 후보들에 대해 Python 유사도 재계산
+            for candidate_info in standard_candidates:
+                source = candidate_info['source']
+                candidate = candidate_info['candidate']
+                
+                # Python 유사도 재계산
+                python_similarity = self._calculate_similarity(
+                    entity_input.entity_name, 
+                    source.get('concept_name', '')
+                )
+                
+                all_standard_candidates.append({
+                    'concept': source,
+                    'final_score': python_similarity,  # Python 유사도 사용
+                    'is_original_standard': True,
+                    'original_candidate': candidate,
+                    'elasticsearch_score': candidate['_score'],
+                    'python_similarity': python_similarity
+                })
+            
+            # 3-2. Non-standard → Standard 후보들에 대해 Python 유사도 재계산
+            for mapping in non_standard_to_standard_mappings:
+                non_standard_source = mapping['non_standard_source']
+                non_standard_candidate = mapping['non_standard_candidate']
+                standard_candidates_list = mapping['standard_candidates']
+                
+                for std_candidate in standard_candidates_list:
+                    # Python 유사도 재계산
+                    python_similarity = self._calculate_similarity(
+                        entity_input.entity_name, 
+                        std_candidate.get('concept_name', '')
+                    )
+                    
+                    all_standard_candidates.append({
+                        'concept': std_candidate,
+                        'final_score': python_similarity,  # Python 유사도 사용
+                        'is_original_standard': False,
+                        'original_non_standard': non_standard_source,
+                        'original_candidate': non_standard_candidate,
+                        'python_similarity': python_similarity
+                    })
+            
+            # 4단계: Python 유사도 기준으로 정렬하여 최고 점수 선택
+            if not all_standard_candidates:
                 logger.warning(f"⚠️ 매핑 실패 - 처리된 후보 없음: {entity_name}")
                 return None
             
-            best_candidate = max(processed_candidates, key=lambda x: x['final_score'])
+            # Python 유사도 기준으로 정렬
+            sorted_candidates = sorted(all_standard_candidates, key=lambda x: x['final_score'], reverse=True)
+            best_candidate = sorted_candidates[0]
             
-            # 4단계: 매핑 결과 생성
-            mapping_result = self._create_mapping_result(entity_input, best_candidate, processed_candidates[1:4])
+            # 5단계: 매핑 결과 생성
+            mapping_result = self._create_mapping_result(entity_input, best_candidate, sorted_candidates[1:4])
             
             mapping_type = "direct_standard" if best_candidate['is_original_standard'] else "non_standard_to_standard"
             logger.info(f"✅ 매핑 성공 ({mapping_type}): {entity_name} -> {mapping_result.mapped_concept_name}")
@@ -273,14 +332,6 @@ class EntityMappingAPI:
                 "vocabulary_id": entity_input.vocabulary_id or "SNOMED"
             })
         
-        elif entity_input.entity_type == EntityTypeAPI.DRUG:
-            entities_to_map.append({
-                "entity_type": "drug",
-                "entity_name": entity_input.entity_name,
-                "domain_id": entity_input.domain_id or "Drug",
-                "vocabulary_id": entity_input.vocabulary_id or "RxNorm"
-            })
-        
         elif entity_input.entity_type == EntityTypeAPI.TEST:
             entities_to_map.append({
                 "entity_type": "test",
@@ -297,19 +348,74 @@ class EntityMappingAPI:
                 "vocabulary_id": entity_input.vocabulary_id or "SNOMED"
             })
         
+        elif entity_input.entity_type == EntityTypeAPI.PROCEDURE:
+            entities_to_map.append({
+                "entity_type": "procedure",
+                "entity_name": entity_input.entity_name,
+                "domain_id": entity_input.domain_id or "Procedure",
+                "vocabulary_id": entity_input.vocabulary_id or "SNOMED"
+            })
+        
+        elif entity_input.entity_type == EntityTypeAPI.CONDITION:
+            entities_to_map.append({
+                "entity_type": "condition",
+                "entity_name": entity_input.entity_name,
+                "domain_id": entity_input.domain_id or "Condition",
+                "vocabulary_id": entity_input.vocabulary_id or "SNOMED"
+            })
+
+        elif entity_input.entity_type == EntityTypeAPI.DRUG:
+            entities_to_map.append({
+                "entity_type": "drug",
+                "entity_name": entity_input.entity_name,
+                "domain_id": entity_input.domain_id or "Drug",
+                "vocabulary_id": entity_input.vocabulary_id or "RxNorm"
+            })
+        
+        elif entity_input.entity_type == EntityTypeAPI.OBSERVATION:
+            entities_to_map.append({
+                "entity_type": "observation",
+                "entity_name": entity_input.entity_name,
+                "domain_id": entity_input.domain_id or "Observation",
+                "vocabulary_id": entity_input.vocabulary_id or "SNOMED"
+            })
+        
+        elif entity_input.entity_type == EntityTypeAPI.MEASUREMENT:
+            entities_to_map.append({
+                "entity_type": "measurement",
+                "entity_name": entity_input.entity_name,
+                "domain_id": entity_input.domain_id or "Measurement",
+                "vocabulary_id": entity_input.vocabulary_id or "LOINC"
+            })
+        
+        elif entity_input.entity_type == EntityTypeAPI.PROVIDER:
+            entities_to_map.append({
+                "entity_type": "provider",
+                "entity_name": entity_input.entity_name,
+                "domain_id": entity_input.domain_id or "Provider",
+                "vocabulary_id": entity_input.vocabulary_id or "SNOMED"
+            })
+        
         return entities_to_map
     
     def _normalize_score(self, raw_score: float) -> float:
         """
-        Elasticsearch 점수 정규화 (0.0 ~ 1.0)
+        점수 정규화 (0.0 ~ 1.0)
         
-        점수 기준:
-        - 500+ (정확한 키워드 매칭): 0.95 ~ 1.0
-        - 100+ (높은 유사도): 0.85 ~ 0.95  
-        - 50+ (중간 유사도): 0.70 ~ 0.85
-        - 20+ (낮은 유사도): 0.50 ~ 0.70
-        - 20 미만 (매우 낮은 유사도): 0.0 ~ 0.50
+        현재는 Python 유사도 점수(이미 0~1 사이)를 사용하므로 
+        단순히 0~1 범위로 클리핑만 수행
+        
+        Args:
+            raw_score: 원본 점수 (Python 유사도 또는 Elasticsearch 점수)
+            
+        Returns:
+            0.0 ~ 1.0 사이의 정규화된 점수
         """
+        # Python 유사도 점수인 경우 (0~1 사이)
+        if 0.0 <= raw_score <= 1.0:
+            return raw_score
+        
+        # Elasticsearch 점수인 경우 (이전 로직 유지)
         if raw_score >= 500.0:
             return 0.95 + min((raw_score - 500.0) / 1000.0, 0.05)  # 최대 1.0
         elif raw_score >= 100.0:
@@ -365,10 +471,10 @@ class EntityMappingAPI:
         # Standard 필터 제거한 Elasticsearch 쿼리 구성
         should_queries = [
             {
-                "match_phrase": {
+                "match": {
                     "concept_name": {
                         "query": entity_name,
-                        "boost": 500
+                        "boost": 1000
                     }
                 }
             }
@@ -376,26 +482,11 @@ class EntityMappingAPI:
 
         must_queries = [
             {
-                "bool": {
-                    "should": [
-                        {
-                            "match": {
-                                "concept_name": {
-                                    "query": entity_name,
-                                    "boost": 3.0
-                                }
-                            }
-                        },
-                        {
-                            "wildcard": {
-                                "concept_name": {
-                                    "value": f"*{entity_name}*",
-                                    "boost": 1.2
-                                }
-                            }
-                        }
-                    ],
-                    "minimum_should_match": 1
+                "match": {
+                    "concept_name": {
+                        "query": entity_name,
+                        "boost": 3.0
+                    }
                 }
             }
         ]
@@ -418,7 +509,7 @@ class EntityMappingAPI:
                                     "decay": 0.9
                                 }
                             },
-                            "weight": 30
+                            "weight": 10
                         }
                     ],
                     "boost_mode": "sum",
@@ -826,18 +917,18 @@ def map_entities_from_analysis(analysis: Dict[str, Any]) -> Dict[str, Any]:
             confidence=drug.get("confidence", 1.0)
         ))
     
-            # 검사 관련 엔티티 추출
-        if "test" in analysis and analysis["test"]:
-            test = analysis["test"]
-            # 엔티티 이름 전처리
-            preprocessed_name = api._preprocess_entity_name(test["concept_name"])
-            entity_inputs.append(EntityInput(
-                entity_name=preprocessed_name,
-            entity_type=EntityTypeAPI.TEST,
-            domain_id=test.get("domain_id", "Measurement"),
-            vocabulary_id=test.get("vocabulary_id", "LOINC"),
-            confidence=test.get("confidence", 1.0)
-        ))
+    # 검사 관련 엔티티 추출
+    if "test" in analysis and analysis["test"]:
+        test = analysis["test"]
+        # 엔티티 이름 전처리
+        preprocessed_name = api._preprocess_entity_name(test["concept_name"])
+        entity_inputs.append(EntityInput(
+            entity_name=preprocessed_name,
+        entity_type=EntityTypeAPI.TEST,
+        domain_id=test.get("domain_id", "Measurement"),
+        vocabulary_id=test.get("vocabulary_id", "LOINC"),
+        confidence=test.get("confidence", 1.0)
+    ))
     
     # 수술 관련 엔티티 추출
     if "surgery" in analysis and analysis["surgery"]:
