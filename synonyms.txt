@@ -1,0 +1,6 @@
+# 약어, 풀네임 (콤마로 구분 시 양쪽 모두 동의어로 처리)
+grpc, gRPC Remote Procedure Calls
+es, elasticsearch
+
+# 필요하다면 한쪽 방향으로만 확장도 가능 (=>)
+k8s => kubernetes, k8s

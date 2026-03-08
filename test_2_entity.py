@@ -291,15 +291,15 @@ def main():
     health_check = tester.api.health_check()
     print(f"📊 API 상태: {health_check}")
     
-    # 테스트 케이스 1: ST-segment elevation myocardial infarction (STEMI)
+    # 테스트 케이스 1: Adrenal Cushing's syndrome
     print("\n" + "="*80)
-    print("📋 테스트 케이스 1: ST-segment elevation myocardial infarction (STEMI)")
+    print("📋 테스트 케이스 1: Adrenal Cushing's syndrome")
     print("="*80)
     tester.test_entity_mapping_6_steps(
-        entity_name="ST-segment elevation myocardial infarction (STEMI)",
-        entity_type="diagnostic",
-        golden_concept_id="4296653",
-        golden_concept_name="Acute ST segment elevation myocardial infarction"
+        entity_name="Adrenal Cushing's syndrome",
+        entity_type="condition",
+        golden_concept_id="4030206",
+        golden_concept_name="Adrenal Cushing's syndrome"
     )
     
     # 테스트 케이스 2: Acute Coronary Syndromes (ACS)

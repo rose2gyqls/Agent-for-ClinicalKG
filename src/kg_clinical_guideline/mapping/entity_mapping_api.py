@@ -471,7 +471,7 @@ class EntityMappingAPI:
         # Standard 필터 제거한 Elasticsearch 쿼리 구성
         should_queries = [
             {
-                "match": {
+                "term": {
                     "concept_name": {
                         "query": entity_name,
                         "boost": 1000
@@ -490,14 +490,14 @@ class EntityMappingAPI:
                 }
             }
         ]
-        
+
         query = {
             "query": {
                 "function_score": {
                     "query": {
                         "bool": {
-                            "must": must_queries,
-                            "should": should_queries
+                            "must": must_queries
+                            # "should": should_queries
                         }
                     },
                     "functions": [
